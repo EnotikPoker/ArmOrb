@@ -18,8 +18,9 @@ MonoBehaviour:
     \u044F\u0434"
   damage: 1
   reach: 2.6
-  rotationSpeed: 180
+  rotationSpeed: 300
   growth: 1
   initialReflection: 1
   sprite: {fileID: 21300000, guid: 8ae251ef2add47123a67476bfc8e876e, type: 3}
   prefab: {fileID: 1747974365878085833, guid: ae233faabfcaa11a5b8b70a415c2de78, type: 3}
+  shape: {fileID: 11400000, guid: 7b089d2475e256805b878b5224445e01, type: 2}

@@ -3,117 +3,154 @@ using UnityEngine;
 
 namespace ArmOrb
 {
-    // No GameObjects or frame-time dependency: the same seed and fixed steps reproduce a fight.
     public sealed class ArenaSimulation
     {
         public CombatantState[] Orbs { get; }
-        public float Elapsed { get; private set; }
+        double elapsed, poisonClock;
+        public float Elapsed => (float)elapsed;
         public MatchResult Result { get; private set; }
-        public readonly float Size, Radius, Speed;
+        public readonly float Size, Radius, Speed, Gravity, Restitution, MinimumBounce;
+        public readonly bool UsesGravity;
         public readonly int Seed;
         public event Action<CombatEvent> Event;
-        readonly WeaponSegment[] first = new WeaponSegment[3], second = new WeaponSegment[3];
-        readonly bool[] bodyContact = new bool[2];
-        bool weaponContact, orbContact;
-        float poisonClock;
+        readonly WeaponColliderBuffer first=new WeaponColliderBuffer(),second=new WeaponColliderBuffer();
+        readonly WeaponColliderBuffer sampleFirst=new WeaponColliderBuffer(),sampleSecond=new WeaponColliderBuffer();
+        readonly bool[] bodyContact=new bool[2];
+        readonly Vector2[] start=new Vector2[2],end=new Vector2[2];
+        readonly float[] startAngle=new float[2],deltaAngle=new float[2];
+        bool weaponContact,orbContact;
+        float clashCooldown;
 
-        public ArenaSimulation(WeaponState player, WeaponState enemy, float playerHP = 100, float enemyHP = 100,
-            int seed = 1, float size = 10, float radius = 0.55f, float speed = 3.8f)
+        public ArenaSimulation(WeaponState player,WeaponState enemy,float playerHP=100,float enemyHP=100,
+            int seed=1,float size=10,float radius=0.55f,float speed=6.4f,bool gravity=false,
+            float gravityAcceleration=9.8f,float restitution=1,float minimumBounce=8)
         {
-            Size = Mathf.Max(size, radius * 8); Radius = radius; Speed = speed; Seed = seed;
-            Orbs = new[] { new CombatantState(playerHP, player), new CombatantState(enemyHP, enemy) };
-            var random = new System.Random(seed);
-            for (int i = 0; i < 2; i++)
+            Size=Mathf.Max(size,radius*8); Radius=radius; Speed=speed; Seed=seed;
+            UsesGravity=gravity; Gravity=gravity?gravityAcceleration:0; Restitution=restitution; MinimumBounce=gravity?minimumBounce:0;
+            Orbs=new[]{new CombatantState(playerHP,player),new CombatantState(enemyHP,enemy)};
+            var random=new System.Random(seed);
+            for(int i=0;i<2;i++)
             {
-                float angle = (float)(random.NextDouble() * Math.PI * 2);
-                Orbs[i].Position = new Vector2((i == 0 ? -1 : 1) * Size * 0.23f, (float)(random.NextDouble() - 0.5) * Size * 0.25f);
-                Orbs[i].Velocity = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * Speed;
-                Orbs[i].Angle = (float)random.NextDouble() * 360;
-                Orbs[i].RotationDirection = i == 0 ? 1 : -1;
+                float angle=(float)(random.NextDouble()*Math.PI*2);
+                Orbs[i].Position=new Vector2((i==0?-1:1)*Size*0.23f,(float)(random.NextDouble()-0.5)*Size*0.15f);
+                Orbs[i].Velocity=new Vector2(Mathf.Cos(angle),Mathf.Sin(angle))*Speed;
+                if(gravity)
+                {
+                    float horizontal=(0.5f+(float)random.NextDouble()*0.3f)*Speed;
+                    Orbs[i].Velocity=new Vector2(i==0?horizontal:-horizontal,2+(float)random.NextDouble()*3);
+                }
+                Orbs[i].Angle=(float)random.NextDouble()*360;
+                Orbs[i].RotationDirection=i==0?1:-1;
             }
         }
-
         public void Step(float dt)
         {
-            if (Result != MatchResult.InProgress || dt <= 0) return;
-            // Sample tip travel at less than 0.3 orb radii, including very fast blades/long spears.
-            // This is geometric substepping, independent of the rendered frame rate; no stat caps.
-            float fastestTip = 0;
-            for (int i = 0; i < 2; i++)
-                fastestTip = Mathf.Max(fastestTip, Orbs[i].Weapon.RotationSpeed * Mathf.Deg2Rad * Radius * (Orbs[i].Weapon.Reach + 1.5f));
-            int steps = Mathf.Max(1, Mathf.CeilToInt((fastestTip + Speed * 2) * dt / (Radius * 0.3f)));
-            float h = dt / steps;
-            for (int s = 0; s < steps && Result == MatchResult.InProgress; s++) Substep(h);
+            if(Result!=MatchResult.InProgress || dt<=0) return;
+            float travel=0;
+            for(int i=0;i<2;i++)
+                travel+=Orbs[i].Velocity.magnitude+Gravity*dt+Orbs[i].Weapon.RotationSpeed*Mathf.Deg2Rad*Radius*(Orbs[i].Weapon.Reach+2);
+            // Include BOTH moving contours and real ballistic velocities. Even at x2 every tick is
+            // consumed unchanged, with contour travel below the thinnest visible weapon features.
+            int steps=Mathf.Max(1,Mathf.CeilToInt(travel*dt/(Radius*0.08f)));
+            float h=dt/steps;
+            for(int s=0;s<steps && Result==MatchResult.InProgress;s++) Substep(h);
         }
-
         void Substep(float dt)
         {
-            Elapsed += dt;
-            for (int i = 0; i < 2; i++)
+            elapsed+=dt; clashCooldown=Mathf.Max(0,clashCooldown-dt);
+            for(int i=0;i<2;i++)
             {
-                var orb = Orbs[i];
-                if (OrbMotion.Move(orb, dt, Size * 0.5f, Radius)) Emit(CombatEventKind.Wall, orb.Position, i);
-                orb.Angle = Mathf.Repeat(orb.Angle + orb.RotationDirection * orb.Weapon.RotationSpeed * dt, 360);
+                var orb=Orbs[i]; start[i]=orb.Position; startAngle[i]=orb.Angle;
+                deltaAngle[i]=orb.RotationDirection*orb.Weapon.RotationSpeed*dt;
+                if(OrbMotion.Move(orb,dt,Size*0.5f,Radius,Gravity,Restitution,MinimumBounce)) Emit(CombatEventKind.Wall,orb.Position,i);
+                orb.Angle=Mathf.Repeat(orb.Angle+deltaAngle[i],360);
             }
-            bool touches = OrbMotion.Resolve(Orbs[0], Orbs[1], Radius, Speed);
-            if (touches && !orbContact) Emit(CombatEventKind.Body, (Orbs[0].Position + Orbs[1].Position) / 2);
-            orbContact = touches;
-            // Corrections can push a body against a wall; resolve the bounds immediately.
-            for (int i = 0; i < 2; i++) OrbMotion.Move(Orbs[i], 0, Size * 0.5f, Radius);
-            int ac = WeaponGeometry.GetSegments(Orbs[0], Radius, first);
-            int bc = WeaponGeometry.GetSegments(Orbs[1], Radius, second);
-            bool clash = WeaponGeometry.Clash(first, ac, second, bc);
-            if (clash && !weaponContact)
+            bool touches=OrbMotion.Resolve(Orbs[0],Orbs[1],Radius,Speed,UsesGravity,Restitution);
+            if(touches && !orbContact) Emit(CombatEventKind.Body,(Orbs[0].Position+Orbs[1].Position)/2);
+            orbContact=touches;
+            for(int i=0;i<2;i++)
             {
-                bool shieldA = Orbs[0].Weapon.Kind == WeaponKind.Shield;
-                bool shieldB = Orbs[1].Weapon.Kind == WeaponKind.Shield;
-                if (shieldA != shieldB)
+                OrbMotion.Move(Orbs[i],0,Size*0.5f,Radius,Gravity,Restitution,MinimumBounce); end[i]=Orbs[i].Position;
+            }
+            WeaponGeometry.Fill(Orbs[0],Radius,first); WeaponGeometry.Fill(Orbs[1],Radius,second);
+            bool clash=WeaponGeometry.Clash(first,second);
+            bool hitA=WeaponGeometry.TouchesBody(first,Orbs[1].Position,Radius);
+            bool hitB=WeaponGeometry.TouchesBody(second,Orbs[0].Position,Radius);
+            bool blockA=false,blockB=false;
+            if(clash && !weaponContact && clashCooldown<=0)
+            {
+                float impact=Fraction(2);
+                // Compare actual impact times. An unrelated overlap no longer disables all body hits.
+                blockA=hitA && impact<=Fraction(0)+0.001f;
+                blockB=hitB && impact<=Fraction(1)+0.001f;
+                bool shieldA=Orbs[0].Weapon.Kind==WeaponKind.Shield,shieldB=Orbs[1].Weapon.Kind==WeaponKind.Shield;
+                if(shieldA!=shieldB)
                 {
-                    int defender = shieldA ? 0 : 1, attacker = 1 - defender;
-                    float returned = Orbs[defender].Weapon.Block(Orbs[attacker].Weapon.Damage);
+                    int defender=shieldA?0:1,attacker=1-defender;
+                    float returned=Orbs[defender].Weapon.Block(Orbs[attacker].Weapon.Damage);
                     Orbs[attacker].Health.Damage(returned);
-                    Emit(CombatEventKind.Block, Orbs[attacker].Position, attacker, returned);
+                    Emit(CombatEventKind.Block,Orbs[attacker].Position,attacker,returned);
                 }
-                else Emit(CombatEventKind.Clash, (Orbs[0].Position + Orbs[1].Position) * 0.5f);
-                for (int i = 0; i < 2; i++) Orbs[i].RotationDirection *= -1;
-                Vector2 n = OrbMotion.Direction(Orbs[1].Position - Orbs[0].Position, Vector2.right);
-                Orbs[0].Velocity = OrbMotion.Direction(Orbs[0].Velocity - n * Speed * 0.45f, -n) * Speed;
-                Orbs[1].Velocity = OrbMotion.Direction(Orbs[1].Velocity + n * Speed * 0.45f, n) * Speed;
+                else Emit(CombatEventKind.Clash,(Orbs[0].Position+Orbs[1].Position)*0.5f);
+                for(int i=0;i<2;i++)
+                {
+                    Orbs[i].RotationDirection*=-1;
+                    Orbs[i].Angle=Mathf.Repeat(startAngle[i]+deltaAngle[i]*(2*impact-1),360);
+                }
+                Vector2 n=OrbMotion.Direction(Orbs[1].Position-Orbs[0].Position,Vector2.right);
+                float approach=Vector2.Dot(Orbs[1].Velocity-Orbs[0].Velocity,n);
+                if(approach<0)
+                {
+                    float impulse=-approach*0.08f;
+                    Orbs[0].Velocity-=n*impulse; Orbs[1].Velocity+=n*impulse;
+                    if(!UsesGravity)
+                        for(int i=0;i<2;i++) Orbs[i].Velocity=OrbMotion.Direction(Orbs[i].Velocity,i==0?-n:n)*Speed;
+                }
+                clashCooldown=0.045f;
             }
-            weaponContact = clash;
-            bool hitA = WeaponGeometry.TouchesBody(first, ac, Orbs[1].Position, Radius);
-            bool hitB = WeaponGeometry.TouchesBody(second, bc, Orbs[0].Position, Radius);
-            // Both hits resolve before death detection, so simultaneous knockouts are draws.
-            if (!clash && hitA && !bodyContact[0]) Hit(0);
-            if (!clash && hitB && !bodyContact[1]) Hit(1);
-            bodyContact[0] = hitA; bodyContact[1] = hitB;
-            poisonClock += dt;
-            if (poisonClock >= 1)
+            // A shield remains a barrier during its single continuous blocking contact.
+            if(clash && Orbs[1].Weapon.Kind==WeaponKind.Shield) blockA=true;
+            if(clash && Orbs[0].Weapon.Kind==WeaponKind.Shield) blockB=true;
+            weaponContact=clash;
+            if(hitA && !bodyContact[0] && !blockA) Hit(0);
+            if(hitB && !bodyContact[1] && !blockB) Hit(1);
+            bodyContact[0]=hitA; bodyContact[1]=hitB;
+            poisonClock+=dt;
+            if(poisonClock>=1)
             {
-                poisonClock -= 1;
-                for (int i = 0; i < 2; i++)
-                    if (Orbs[i].Health.PoisonPerSecond > 0)
-                    {
-                        Orbs[i].Health.Damage(Orbs[i].Health.PoisonPerSecond);
-                        Emit(CombatEventKind.Poison, Orbs[i].Position, i, Orbs[i].Health.PoisonPerSecond);
-                    }
+                poisonClock-=1;
+                for(int i=0;i<2;i++) if(Orbs[i].Health.PoisonPerSecond>0)
+                {
+                    Orbs[i].Health.Damage(Orbs[i].Health.PoisonPerSecond);
+                    Emit(CombatEventKind.Poison,Orbs[i].Position,i,Orbs[i].Health.PoisonPerSecond);
+                }
             }
-            if (Orbs[0].Health.IsDead || Orbs[1].Health.IsDead)
+            if(Orbs[0].Health.IsDead || Orbs[1].Health.IsDead)
             {
-                Result = Orbs[0].Health.IsDead && Orbs[1].Health.IsDead ? MatchResult.Draw
-                    : Orbs[1].Health.IsDead ? MatchResult.Player : MatchResult.Enemy;
-                Emit(CombatEventKind.Finished, Vector2.zero);
+                Result=Orbs[0].Health.IsDead && Orbs[1].Health.IsDead ? MatchResult.Draw : Orbs[1].Health.IsDead ? MatchResult.Player : MatchResult.Enemy;
+                Emit(CombatEventKind.Finished,Vector2.zero);
             }
+        }
+        float Fraction(int type)
+        {
+            if(Sample(type,0)) return 0;
+            float low=0,high=1;
+            for(int i=0;i<6;i++) { float mid=(low+high)*0.5f; if(Sample(type,mid)) high=mid; else low=mid; }
+            return high;
+        }
+        bool Sample(int type,float t)
+        {
+            Vector2 a=Vector2.Lerp(start[0],end[0],t),b=Vector2.Lerp(start[1],end[1],t);
+            if(type!=1) WeaponGeometry.Fill(Orbs[0].Weapon,Radius,a,startAngle[0]+deltaAngle[0]*t,sampleFirst);
+            if(type!=0) WeaponGeometry.Fill(Orbs[1].Weapon,Radius,b,startAngle[1]+deltaAngle[1]*t,sampleSecond);
+            return type==0 ? WeaponGeometry.TouchesBody(sampleFirst,b,Radius) : type==1 ? WeaponGeometry.TouchesBody(sampleSecond,a,Radius) : WeaponGeometry.Clash(sampleFirst,sampleSecond);
         }
         void Hit(int attacker)
         {
-            var target = Orbs[1 - attacker];
-            float damage = Orbs[attacker].Weapon.Damage;
-            target.Health.Damage(damage);
-            Orbs[attacker].Weapon.OnHit(target.Health);
-            Emit(CombatEventKind.Hit, target.Position, 1 - attacker, damage);
+            var target=Orbs[1-attacker]; float damage=Orbs[attacker].Weapon.Damage;
+            target.Health.Damage(damage); Orbs[attacker].Weapon.OnHit(target.Health);
+            Emit(CombatEventKind.Hit,target.Position,1-attacker,damage);
         }
-        void Emit(CombatEventKind kind, Vector2 position, int side = 0, float amount = 0)
-            => Event?.Invoke(new CombatEvent(kind, position, side, amount));
+        void Emit(CombatEventKind kind,Vector2 position,int side=0,float amount=0) => Event?.Invoke(new CombatEvent(kind,position,side,amount));
     }
 }

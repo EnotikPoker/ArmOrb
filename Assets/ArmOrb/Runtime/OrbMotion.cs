@@ -4,38 +4,64 @@ namespace ArmOrb
 {
     public static class OrbMotion
     {
-        public static bool Move(CombatantState orb, float dt, float halfSize, float radius)
+        public static bool Move(CombatantState orb, float dt, float halfSize, float radius,
+            float gravity = 0, float restitution = 1, float minimumBounce = 0)
         {
-            orb.Position += orb.Velocity * dt;
             float limit = halfSize - radius;
             bool hit = false;
-            if (Mathf.Abs(orb.Position.x) > limit)
+            float x = Mathf.Clamp(orb.Position.x, -limit, limit), vx = orb.Velocity.x;
+            if (orb.Position.x != x && Mathf.Sign(vx) == Mathf.Sign(orb.Position.x)) { vx = -vx * restitution; hit = true; }
+            x += vx * dt;
+            if (x > limit) { x = 2 * limit - x; vx = -Mathf.Abs(vx) * restitution; hit = true; }
+            if (x < -limit) { x = -2 * limit - x; vx = Mathf.Abs(vx) * restitution; hit = true; }
+            float y = Mathf.Clamp(orb.Position.y, -limit, limit), vy = orb.Velocity.y;
+            if (orb.Position.y > limit && vy > 0) { vy = -vy * restitution; hit = true; }
+            if (orb.Position.y < -limit && vy < 0) { vy = Mathf.Max(-vy * restitution, minimumBounce); hit = true; }
+            float remaining = dt;
+            // Resolve the impact time and integrate the remaining arc: overshoot must not add bounce energy.
+            for (int contact = 0; contact < 4 && remaining > 0; contact++)
             {
-                orb.Position.x = Mathf.Sign(orb.Position.x) * (2 * limit - Mathf.Abs(orb.Position.x));
-                orb.Velocity.x = -orb.Velocity.x; hit = true;
+                float end = y + vy * remaining - 0.5f * gravity * remaining * remaining;
+                if (end >= -limit && end <= limit) { y = end; vy -= gravity * remaining; remaining = 0; break; }
+                float wall = end < -limit ? -limit : limit;
+                float time = HitTime(y - wall, vy, -gravity, remaining);
+                y = wall; vy -= gravity * time; remaining -= time;
+                vy = wall < 0 ? Mathf.Max(Mathf.Abs(vy) * restitution, minimumBounce) : -Mathf.Abs(vy) * restitution;
+                hit = true;
+                if (time < 0.0000001f && Mathf.Abs(vy) < 0.00001f) { remaining = 0; break; }
             }
-            if (Mathf.Abs(orb.Position.y) > limit)
-            {
-                orb.Position.y = Mathf.Sign(orb.Position.y) * (2 * limit - Mathf.Abs(orb.Position.y));
-                orb.Velocity.y = -orb.Velocity.y; hit = true;
-            }
-            orb.Position = Vector2.Max(Vector2.one * -limit, Vector2.Min(Vector2.one * limit, orb.Position));
-            return hit;
+            orb.Position = new Vector2(Mathf.Clamp(x, -limit, limit), Mathf.Clamp(y, -limit, limit));
+            orb.Velocity = new Vector2(vx, vy); return hit;
         }
-        public static bool Resolve(CombatantState a, CombatantState b, float radius, float speed)
+        static float HitTime(float offset, float velocity, float acceleration, float maxTime)
+        {
+            if (Mathf.Abs(acceleration) < 0.000001f) return Mathf.Clamp(-offset / velocity, 0, maxTime);
+            float root = Mathf.Sqrt(Mathf.Max(0, velocity * velocity - 2 * acceleration * offset));
+            float a = (-velocity + root) / acceleration, b = (-velocity - root) / acceleration;
+            float time = maxTime;
+            if (a >= 0 && a <= time) time = a;
+            if (b >= 0 && b <= time) time = b;
+            return time;
+        }
+        public static bool Resolve(CombatantState a, CombatantState b, float radius, float speed,
+            bool preserveEnergy = false, float restitution = 1)
         {
             Vector2 delta = b.Position - a.Position;
             if (delta.sqrMagnitude >= 4 * radius * radius) return false;
             float distance = delta.magnitude;
             Vector2 normal = distance > 0.00001f ? delta / distance : Vector2.right;
-            float correction = (2 * radius - distance) * 0.5f + 0.001f;
+            float correction = (2 * radius - distance) * 0.5f + 0.0001f;
             a.Position -= normal * correction; b.Position += normal * correction;
             float relative = Vector2.Dot(b.Velocity - a.Velocity, normal);
             if (relative < 0)
             {
-                a.Velocity += normal * relative; b.Velocity -= normal * relative;
-                a.Velocity = Direction(a.Velocity, -normal) * speed;
-                b.Velocity = Direction(b.Velocity, normal) * speed;
+                float impulse = relative * (1 + restitution) * 0.5f;
+                a.Velocity += normal * impulse; b.Velocity -= normal * impulse;
+                if (!preserveEnergy)
+                {
+                    a.Velocity = Direction(a.Velocity, -normal) * speed;
+                    b.Velocity = Direction(b.Velocity, normal) * speed;
+                }
             }
             return true;
         }
