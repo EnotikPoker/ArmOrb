@@ -19,8 +19,9 @@ namespace ArmOrb
         [Min(0)] public float initialReflection = 1;
         public Sprite sprite;
         public WeaponView prefab;
+        public WeaponShapeDefinition shape;
 
-        public WeaponState CreateState() => new WeaponState(kind, damage, reach, rotationSpeed, growth, initialReflection);
+        public WeaponState CreateState() => new WeaponState(kind, damage, reach, rotationSpeed, growth, initialReflection, shape);
     }
 
 }

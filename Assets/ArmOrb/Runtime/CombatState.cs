@@ -21,13 +21,15 @@ namespace ArmOrb
         public float RotationSpeed { get; private set; }
         public float Reflection { get; private set; }
         public float Growth { get; }
+        public WeaponShapeDefinition Shape { get; }
         public int Hits { get; private set; }
         public int Blocks { get; private set; }
         public WeaponState(WeaponKind kind, float damage = 1, float reach = 2.6f,
-            float rotationSpeed = 180, float growth = 1, float reflection = 1)
+            float rotationSpeed = 300, float growth = 1, float reflection = 1, WeaponShapeDefinition shape = null)
         {
             Kind = kind; Damage = damage; Reach = reach;
             RotationSpeed = rotationSpeed; Growth = growth; Reflection = reflection;
+            Shape = shape ? shape : WeaponShapeDefinition.Get(kind);
         }
         public void OnHit(HealthState target)
         {
