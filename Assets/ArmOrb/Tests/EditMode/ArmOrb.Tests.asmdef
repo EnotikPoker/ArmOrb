@@ -1,0 +1,7 @@
+{
+  "name": "ArmOrb.Tests",
+  "rootNamespace": "ArmOrb.Tests",
+  "references": ["ArmOrb.Runtime"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

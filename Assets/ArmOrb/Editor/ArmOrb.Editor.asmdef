@@ -1,0 +1,6 @@
+{
+  "name": "ArmOrb.Editor",
+  "rootNamespace": "ArmOrb.Editor",
+  "references": ["ArmOrb.Runtime"],
+  "includePlatforms": ["Editor"]
+}

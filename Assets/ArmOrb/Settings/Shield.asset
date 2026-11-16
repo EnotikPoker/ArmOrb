@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d1728931fd9f8860dbd8c15e918ac225, type: 3}
+  m_Name: Shield
+  m_EditorClassIdentifier: ArmOrb.Runtime::ArmOrb.WeaponDefinition
+  kind: 4
+  displayName: "\u0429\u0438\u0442"
+  description: "\u0411\u043B\u043E\u043A\u0438 \u0443\u0441\u0438\u043B\u0438\u0432\u0430\u044E\u0442
+    \u0432\u043E\u0437\u0432\u0440\u0430\u0442"
+  damage: 1
+  reach: 2.6
+  rotationSpeed: 180
+  growth: 0.25
+  initialReflection: 1
+  sprite: {fileID: 21300000, guid: 77ce9ccc6d8d7e77082d5ec5b41457ba, type: 3}
+  prefab: {fileID: 4908084756169730531, guid: 700d0b0347e967fc783c7ef8a1b383f4, type: 3}
