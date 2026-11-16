@@ -18,9 +18,8 @@ MonoBehaviour:
     \u0432\u0440\u0430\u0449\u0435\u043D\u0438\u0435"
   damage: 1
   reach: 2.6
-  rotationSpeed: 300
+  rotationSpeed: 180
   growth: 30
   initialReflection: 1
   sprite: {fileID: 21300000, guid: d76d2642de4b89be790bc244800d107a, type: 3}
   prefab: {fileID: 8235528745497329467, guid: da420ec06af272b058a496181cedee52, type: 3}
-  shape: {fileID: 11400000, guid: 918f2e11cd1ac8e88a933ed12bb93671, type: 2}

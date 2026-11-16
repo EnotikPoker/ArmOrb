@@ -12,14 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8ad0dcf86bef2545eb91a469891fdfa5, type: 3}
   m_Name: Arena
   m_EditorClassIdentifier: ArmOrb.Runtime::ArmOrb.ArenaSettings
-  smallSize: 6
-  mediumSize: 8
-  largeSize: 10
+  size: 10
   orbRadius: 0.55
-  moveSpeed: 6.4
-  gravity: 9.8
-  restitution: 1
-  minimumFloorBounce: 8
+  moveSpeed: 3.8
   simulationHz: 120
-  playerColor: {r: 1, g: 0.38431373, b: 0.41568628, a: 1}
-  enemyColor: {r: 0, g: 0.827451, b: 0.8627451, a: 1}
+  playerColor: {r: 0.9411765, g: 0.39607844, b: 0.39607844, a: 1}
+  enemyColor: {r: 0.11372549, g: 0.7254902, b: 0.74509805, a: 1}

@@ -109,6 +109,17 @@ namespace ArmOrb.Tests
             Assert.That(hits, Is.GreaterThan(0));
             for(int i=0;i<2;i++) Assert.That(float.IsNaN(sim.Orbs[i].Position.x), Is.False);
         }
+        [Test] public void SegmentCollisionHandlesCrossingParallelAndSeparatedWeapons()
+        {
+            var a = new WeaponSegment(new Vector2(-1,0),new Vector2(1,0),0.1f);
+            var crossing = new WeaponSegment(new Vector2(0,-1),new Vector2(0,1),0.1f);
+            var parallel = new WeaponSegment(new Vector2(-1,0.1f),new Vector2(1,0.1f),0.1f);
+            var separate = new WeaponSegment(new Vector2(3,0),new Vector2(4,0),0.1f);
+            Assert.That(WeaponGeometry.SegmentDistanceSquared(a,crossing), Is.Zero);
+            Assert.That(WeaponGeometry.SegmentDistanceSquared(a,parallel), Is.EqualTo(0.01f).Within(0.00001f));
+            Assert.That(WeaponGeometry.SegmentDistanceSquared(a,separate), Is.EqualTo(4));
+        }
+
         [TestCase(0,0)] [TestCase(0,1)] [TestCase(0,2)] [TestCase(0,3)] [TestCase(0,4)]
         [TestCase(1,1)] [TestCase(1,2)] [TestCase(1,3)] [TestCase(1,4)]
         [TestCase(2,2)] [TestCase(2,3)] [TestCase(2,4)]

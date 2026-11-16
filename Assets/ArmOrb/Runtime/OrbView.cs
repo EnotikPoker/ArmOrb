@@ -18,14 +18,14 @@ namespace ArmOrb
             Weapon = Instantiate(weaponPrefab, transform.parent);
         }
         public void Hit() => flash = 0.12f;
-        public void Draw(CombatantState state, float radius, float dt, Vector2 position, float angle)
+        public void Draw(CombatantState state, float radius, float dt)
         {
-            transform.position = position;
+            transform.position = state.Position;
             flash = Mathf.Max(0, flash - dt);
             body.color = Color.Lerp(color, Color.white, flash / 0.12f);
             healthLabel.text = Mathf.CeilToInt(state.Health.Current).ToString();
             healthLabel.characterSize = 0.09f * Mathf.Min(1, 2.4f / healthLabel.text.Length);
-            Weapon.Draw(state, radius, position, angle);
+            Weapon.Draw(state, radius);
         }
         public void Remove()
         {
