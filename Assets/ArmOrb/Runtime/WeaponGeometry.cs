@@ -29,6 +29,7 @@ namespace ArmOrb
         // This layout is shared by SpriteRenderers and opaque-pixel collision masks.
         public static int GetParts(WeaponState weapon, WeaponPartPose[] parts)
         {
+            if (weapon.Kind == WeaponKind.Unarmed) return 0;
             var shape = weapon.Shape;
             if (weapon.Kind == WeaponKind.Spear)
             {
@@ -46,6 +47,7 @@ namespace ArmOrb
             => Fill(orb.Weapon, radius, orb.Position, orb.Angle, buffer);
         public static void Fill(WeaponState weapon, float radius, Vector2 position, float angle, WeaponColliderBuffer buffer)
         {
+            if (!weapon.IsMelee) { buffer.Count = 0; buffer.Bounds = new Rect(); return; }
             float radians = angle * Mathf.Deg2Rad;
             Vector2 axis = new Vector2(Mathf.Cos(radians),Mathf.Sin(radians)), normal = new Vector2(-axis.y,axis.x);
             int parts = GetParts(weapon, buffer.Parts); buffer.Count = 0;
@@ -69,6 +71,7 @@ namespace ArmOrb
         }
         public static bool TouchesBody(WeaponColliderBuffer buffer, Vector2 centre, float radius)
         {
+            if (buffer.Count == 0) return false;
             if (PointRectDistance(centre,buffer.Bounds) > radius*radius) return false;
             for (int i=0;i<buffer.Count;i++)
             {
@@ -87,6 +90,7 @@ namespace ArmOrb
         }
         public static bool Clash(WeaponColliderBuffer a, WeaponColliderBuffer b)
         {
+            if (a.Count == 0 || b.Count == 0) return false;
             if (a.Bounds.xMin>b.Bounds.xMax || b.Bounds.xMin>a.Bounds.xMax || a.Bounds.yMin>b.Bounds.yMax || b.Bounds.yMin>a.Bounds.yMax) return false;
             for (int i=0;i<a.Count;i++) for (int j=0;j<b.Count;j++)
                 if (BoxesTouch(a.Boxes[i],b.Boxes[j])) return true;

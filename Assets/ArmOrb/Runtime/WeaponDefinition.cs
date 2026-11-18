@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace ArmOrb
 {
-    public enum WeaponKind { Sword, Spear, Blade, Scythe, Shield }
+    public enum WeaponKind { Sword = 0, Spear = 1, Blade = 2, Scythe = 3, Shield = 4, Unarmed = 5, Bow = 6, Staff = 7, Shuriken = 8 }
 
     [CreateAssetMenu(menuName = "ArmOrb/Weapon")]
     public sealed class WeaponDefinition : ScriptableObject
@@ -21,7 +21,15 @@ namespace ArmOrb
         public WeaponView prefab;
         public WeaponShapeDefinition shape;
 
-        public WeaponState CreateState() => new WeaponState(kind, damage, reach, rotationSpeed, growth, initialReflection, shape);
+        [Header("Ranged combat")]
+        [Min(0.05f)] public float cooldown = 1;
+        [Min(0.1f)] public float projectileSpeed = 14;
+        [Min(0.01f)] public float blastRadius = 1.1f;
+        [Min(0.1f)] public float waveSpeed = 6;
+        public Sprite projectileSprite;
+
+        public WeaponState CreateState() => new WeaponState(kind, damage, reach, rotationSpeed, growth, initialReflection, shape,
+            cooldown, projectileSpeed, blastRadius, waveSpeed);
     }
 
 }

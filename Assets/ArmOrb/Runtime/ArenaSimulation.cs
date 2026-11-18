@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace ArmOrb
 {
-    public sealed class ArenaSimulation
+    public sealed partial class ArenaSimulation
     {
         public CombatantState[] Orbs { get; }
         double elapsed, poisonClock;
@@ -20,23 +20,26 @@ namespace ArmOrb
         readonly float[] startAngle=new float[2],deltaAngle=new float[2];
         bool weaponContact,orbContact;
         float clashCooldown;
+        readonly float minimumHorizontal;
+        readonly bool[] unarmedShieldContact = new bool[2];
 
         public ArenaSimulation(WeaponState player,WeaponState enemy,float playerHP=100,float enemyHP=100,
             int seed=1,float size=10,float radius=0.55f,float speed=6.4f,bool gravity=false,
-            float gravityAcceleration=9.8f,float restitution=1,float minimumBounce=8)
+            float gravityAcceleration=20,float restitution=1,float minimumBounce=-1,float minimumHorizontal=0.4f)
         {
             Size=Mathf.Max(size,radius*8); Radius=radius; Speed=speed; Seed=seed;
-            UsesGravity=gravity; Gravity=gravity?gravityAcceleration:0; Restitution=restitution; MinimumBounce=gravity?minimumBounce:0;
+            UsesGravity=gravity; Gravity=gravity?gravityAcceleration:0; Restitution=restitution; MinimumBounce=gravity?(minimumBounce < 0 ? Mathf.Sqrt(2*Gravity*0.85f*(Size-2*radius)) : minimumBounce):0;
+            this.minimumHorizontal=minimumHorizontal;
             Orbs=new[]{new CombatantState(playerHP,player),new CombatantState(enemyHP,enemy)};
             var random=new System.Random(seed);
             for(int i=0;i<2;i++)
             {
                 float angle=(float)(random.NextDouble()*Math.PI*2);
                 Orbs[i].Position=new Vector2((i==0?-1:1)*Size*0.23f,(float)(random.NextDouble()-0.5)*Size*0.15f);
-                Orbs[i].Velocity=new Vector2(Mathf.Cos(angle),Mathf.Sin(angle))*Speed;
+                Orbs[i].Velocity=new Vector2(Mathf.Cos(angle),Mathf.Sin(angle))*MoveSpeed(i);
                 if(gravity)
                 {
-                    float horizontal=(0.5f+(float)random.NextDouble()*0.3f)*Speed;
+                    float horizontal=(0.5f+(float)random.NextDouble()*0.3f)*MoveSpeed(i);
                     Orbs[i].Velocity=new Vector2(i==0?horizontal:-horizontal,2+(float)random.NextDouble()*3);
                 }
                 Orbs[i].Angle=(float)random.NextDouble()*360;
@@ -46,9 +49,11 @@ namespace ArmOrb
         public void Step(float dt)
         {
             if(Result!=MatchResult.InProgress || dt<=0) return;
+            foreach(var p in projectiles) p.PreviousPosition=p.Position;
+            foreach(var w in waves) w.PreviousRadius=w.Radius;
             float travel=0;
             for(int i=0;i<2;i++)
-                travel+=Orbs[i].Velocity.magnitude+Gravity*dt+Orbs[i].Weapon.RotationSpeed*Mathf.Deg2Rad*Radius*(Orbs[i].Weapon.Reach+2);
+                travel+=Orbs[i].Velocity.magnitude+Gravity*dt+(Orbs[i].Weapon.IsMelee ? Orbs[i].Weapon.RotationSpeed*Mathf.Deg2Rad*Radius*(Orbs[i].Weapon.Reach+2) : 0);
             // Include BOTH moving contours and real ballistic velocities. Even at x2 every tick is
             // consumed unchanged, with contour travel below the thinnest visible weapon features.
             int steps=Mathf.Max(1,Mathf.CeilToInt(travel*dt/(Radius*0.08f)));
@@ -62,15 +67,18 @@ namespace ArmOrb
             {
                 var orb=Orbs[i]; start[i]=orb.Position; startAngle[i]=orb.Angle;
                 deltaAngle[i]=orb.RotationDirection*orb.Weapon.RotationSpeed*dt;
-                if(OrbMotion.Move(orb,dt,Size*0.5f,Radius,Gravity,Restitution,MinimumBounce)) Emit(CombatEventKind.Wall,orb.Position,i);
+                if(OrbMotion.Move(orb,dt,Size*0.5f,Radius,Gravity,Restitution,Bounce(i))) Emit(CombatEventKind.Wall,orb.Position,i);
                 orb.Angle=Mathf.Repeat(orb.Angle+deltaAngle[i],360);
             }
-            bool touches=OrbMotion.Resolve(Orbs[0],Orbs[1],Radius,Speed,UsesGravity,Restitution);
+            bool touches=OrbMotion.Resolve(Orbs[0],Orbs[1],Radius,MoveSpeed(0),UsesGravity,Restitution,MoveSpeed(1));
             if(touches && !orbContact) Emit(CombatEventKind.Body,(Orbs[0].Position+Orbs[1].Position)/2);
+            bool newBodyContact=touches && !orbContact;
             orbContact=touches;
             for(int i=0;i<2;i++)
             {
-                OrbMotion.Move(Orbs[i],0,Size*0.5f,Radius,Gravity,Restitution,MinimumBounce); end[i]=Orbs[i].Position;
+                if(UsesGravity && Mathf.Abs(Orbs[i].Velocity.x)<MoveSpeed(i)*minimumHorizontal)
+                    Orbs[i].Velocity.x=(Orbs[i].Velocity.x!=0?Mathf.Sign(Orbs[i].Velocity.x):(i==0?1:-1))*MoveSpeed(i)*minimumHorizontal;
+                OrbMotion.Move(Orbs[i],0,Size*0.5f,Radius,Gravity,Restitution,Bounce(i)); end[i]=Orbs[i].Position;
             }
             WeaponGeometry.Fill(Orbs[0],Radius,first); WeaponGeometry.Fill(Orbs[1],Radius,second);
             bool clash=WeaponGeometry.Clash(first,second);
@@ -104,7 +112,7 @@ namespace ArmOrb
                     float impulse=-approach*0.08f;
                     Orbs[0].Velocity-=n*impulse; Orbs[1].Velocity+=n*impulse;
                     if(!UsesGravity)
-                        for(int i=0;i<2;i++) Orbs[i].Velocity=OrbMotion.Direction(Orbs[i].Velocity,i==0?-n:n)*Speed;
+                        for(int i=0;i<2;i++) Orbs[i].Velocity=OrbMotion.Direction(Orbs[i].Velocity,i==0?-n:n)*MoveSpeed(i);
                 }
                 clashCooldown=0.045f;
             }
@@ -115,6 +123,19 @@ namespace ArmOrb
             if(hitA && !bodyContact[0] && !blockA) Hit(0);
             if(hitB && !bodyContact[1] && !blockB) Hit(1);
             bodyContact[0]=hitA; bodyContact[1]=hitB;
+            for(int i=0;i<2;i++)
+            {
+                bool blocked=Orbs[i].Weapon.Kind==WeaponKind.Unarmed && Orbs[1-i].Weapon.Kind==WeaponKind.Shield &&
+                    WeaponGeometry.TouchesBody(i==0?second:first,Orbs[i].Position,Radius);
+                if(blocked && !unarmedShieldContact[i])
+                {
+                    float returned=Orbs[1-i].Weapon.Block(Orbs[i].Weapon.Damage);
+                    Orbs[i].Health.Damage(returned); Emit(CombatEventKind.Block,Orbs[i].Position,i,returned);
+                }
+                if(Orbs[i].Weapon.Kind==WeaponKind.Unarmed && newBodyContact && !blocked) Hit(i);
+                unarmedShieldContact[i]=blocked;
+            }
+            TickProjectiles(dt);
             poisonClock+=dt;
             if(poisonClock>=1)
             {
@@ -145,12 +166,9 @@ namespace ArmOrb
             if(type!=0) WeaponGeometry.Fill(Orbs[1].Weapon,Radius,b,startAngle[1]+deltaAngle[1]*t,sampleSecond);
             return type==0 ? WeaponGeometry.TouchesBody(sampleFirst,b,Radius) : type==1 ? WeaponGeometry.TouchesBody(sampleSecond,a,Radius) : WeaponGeometry.Clash(sampleFirst,sampleSecond);
         }
-        void Hit(int attacker)
-        {
-            var target=Orbs[1-attacker]; float damage=Orbs[attacker].Weapon.Damage;
-            target.Health.Damage(damage); Orbs[attacker].Weapon.OnHit(target.Health);
-            Emit(CombatEventKind.Hit,target.Position,1-attacker,damage);
-        }
+        float MoveSpeed(int side) => Speed+Orbs[side].Weapon.SpeedBonus;
+        float Bounce(int side) => Speed>0 ? MinimumBounce*MoveSpeed(side)/Speed : MinimumBounce;
+        void Hit(int attacker) => DamageHit(attacker,Orbs[attacker].Weapon.Damage,Orbs[1-attacker].Position);
         void Emit(CombatEventKind kind,Vector2 position,int side=0,float amount=0) => Event?.Invoke(new CombatEvent(kind,position,side,amount));
     }
 }

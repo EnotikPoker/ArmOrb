@@ -22,20 +22,38 @@ namespace ArmOrb
         public float Reflection { get; private set; }
         public float Growth { get; }
         public WeaponShapeDefinition Shape { get; }
+        public bool IsRanged => Kind == WeaponKind.Bow || Kind == WeaponKind.Staff || Kind == WeaponKind.Shuriken;
+        public bool IsMelee => !IsRanged && Kind != WeaponKind.Unarmed;
+        public float SpeedBonus { get; private set; }
+        public int ArrowCount { get; private set; } = 1;
+        public int Bounces { get; private set; } = 1;
+        public float BlastRadius { get; private set; }
+        public float Cooldown { get; }
+        public float ProjectileSpeed { get; }
+        public float WaveSpeed { get; }
+        public float ReloadRemaining;
         public int Hits { get; private set; }
         public int Blocks { get; private set; }
         public WeaponState(WeaponKind kind, float damage = 1, float reach = 2.6f,
-            float rotationSpeed = 300, float growth = 1, float reflection = 1, WeaponShapeDefinition shape = null)
+            float rotationSpeed = 300, float growth = 1, float reflection = 1, WeaponShapeDefinition shape = null,
+            float cooldown = 1, float projectileSpeed = 14, float blastRadius = 1.1f, float waveSpeed = 6)
         {
             Kind = kind; Damage = damage; Reach = reach;
             RotationSpeed = rotationSpeed; Growth = growth; Reflection = reflection;
             Shape = shape ? shape : WeaponShapeDefinition.Get(kind);
+            Cooldown = Mathf.Max(0.05f, cooldown); ProjectileSpeed = Mathf.Max(0.1f, projectileSpeed);
+            BlastRadius = Mathf.Max(0.01f, blastRadius); WaveSpeed = Mathf.Max(0.1f, waveSpeed);
+            ReloadRemaining = IsRanged ? Cooldown : 0;
         }
         public void OnHit(HealthState target)
         {
             Hits++;
             switch (Kind)
             {
+                case WeaponKind.Unarmed: SpeedBonus += Growth; break;
+                case WeaponKind.Bow: ArrowCount++; break;
+                case WeaponKind.Staff: BlastRadius += Growth; break;
+                case WeaponKind.Shuriken: Bounces++; break;
                 case WeaponKind.Sword: Damage += Growth; break;
                 case WeaponKind.Spear: Reach += Growth; break;
                 case WeaponKind.Blade: RotationSpeed += Growth; break;
@@ -51,6 +69,10 @@ namespace ArmOrb
         }
         public string Stat => Kind switch
         {
+            WeaponKind.Unarmed => $"СКОРОСТЬ  +{SpeedBonus:0.#}",
+            WeaponKind.Bow => $"СТРЕЛЫ  {ArrowCount}",
+            WeaponKind.Staff => $"РАДИУС  {BlastRadius:0.##}",
+            WeaponKind.Shuriken => $"ОТСКОКИ  {Bounces}",
             WeaponKind.Sword => $"УРОН  {Damage:0.#}",
             WeaponKind.Spear => $"ДЛИНА  {Reach:0.#}r",
             WeaponKind.Blade => $"ВРАЩЕНИЕ  {RotationSpeed:0}°/с",
@@ -71,7 +93,7 @@ namespace ArmOrb
     }
 
     public enum MatchResult { InProgress, Player, Enemy, Draw }
-    public enum CombatEventKind { Wall, Body, Hit, Clash, Block, Poison, Finished }
+    public enum CombatEventKind { Wall, Body, Hit, Clash, Block, Poison, Shot, Explosion, Finished }
     public readonly struct CombatEvent
     {
         public readonly CombatEventKind Kind;

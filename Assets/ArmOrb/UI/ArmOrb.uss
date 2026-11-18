@@ -1,4 +1,4 @@
-.app { flex-grow: 1; background-color: white; color: #111111; padding: 14px 22px 10px; }
+.app { flex-grow: 1; background-color: #f5f5f3; color: #111111; padding: 14px 22px 10px; }
 Label { white-space: normal; }
 Button { border-width: 1px; border-color: #111111; border-radius: 2px; margin: 0; padding: 6px 12px; color: #111111; background-color: white; font-size: 20px; min-height: 48px; }
 Button:hover { background-color: #eeeeee; }
@@ -8,18 +8,23 @@ Button:focus { border-color: #111111; }
 .header { height: 54px; flex-shrink: 0; }
 .logo { font-size: 32px; -unity-font-style: bold; }
 .version { font-size: 16px; color: #888888; }
-.setup-content { flex-grow: 1; justify-content: center; padding-top: 20px; padding-bottom: 20px; }
+.setup-scroll { flex-grow: 1; }
+.setup-content { padding-top: 22px; padding-bottom: 18px; }
+.setup-options { margin-top: 22px; padding: 0 16px 12px; background-color: white; border-width: 1px; border-color: #d5d5d0; border-radius: 3px; }
 .fighter-cards { align-items: stretch; flex-shrink: 0; }
-.fighter-card { width: 48.5%; border-width: 2px; border-color: #111111; padding: 16px 12px; }
+.fighter-card { width: 48.5%; border-width: 2px; border-color: #111111; padding: 16px 12px; background-color: white; border-radius: 3px; }
 .player { border-top-color: #ff626a; border-top-width: 5px; }
 .enemy { border-top-color: #00c3cc; border-top-width: 5px; }
 .side-name { font-size: 20px; -unity-font-style: bold; }
 .coral { color: #ed4653; }
 .teal { color: #009da7; }
-.weapon-preview { height: 87px; margin-top: 12px; margin-bottom: 8px; }
-.weapon-name { font-size: 25px; -unity-font-style: bold; -unity-text-align: middle-center; margin-bottom: 13px; }
-.weapons { flex-shrink: 0; }
-.weapon-choice { width: 18%; height: 48px; padding: 4px; border-color: #cccccc; }
+.fighter-preview { height: 160px; margin-top: 8px; margin-bottom: 6px; align-items: center; justify-content: center; }
+.preview-orb { width: 108px; height: 108px; margin-right: 54px; }
+.weapon-preview { position: absolute; width: 135px; height: 105px; right: 0; top: 28px; }
+.weapon-description { font-size: 17px; color: #666666; min-height: 48px; -unity-text-align: upper-center; margin-bottom: 12px; }
+.weapon-name { font-size: 24px; -unity-font-style: bold; -unity-text-align: middle-center; margin-bottom: 5px; }
+.weapons { flex-shrink: 0; flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+.weapon-choice { width: 31%; height: 58px; margin-bottom: 7px; padding: 7px; border-color: #cccccc; background-color: #fafaf8; }
 .weapon-choice-image { width: 100%; height: 100%; }
 .player .weapon-choice.selected { border-color: #ed4653; border-width: 2px; background-color: #fff0f1; }
 .enemy .weapon-choice.selected { border-color: #009da7; border-width: 2px; background-color: #e8fbfc; }
@@ -56,7 +61,12 @@ Button:focus { border-color: #111111; }
 .arena-holder { flex-grow: 1; min-height: 220px; align-items: center; justify-content: center; overflow: hidden; }
 .arena { flex-shrink: 0; }
 .stat-row { margin-top: 8px; margin-bottom: 16px; min-height: 40px; flex-shrink: 0; }
-.stat { width: 49%; font-size: 17px; -unity-font-style: bold; }
+.stat-group { width: 49%; }
+.reload-track { height: 4px; margin-top: 8px; background-color: #ddddda; }
+.reload-fill { height: 4px; }
+.player-fill { background-color: #ed4653; }
+.enemy-fill { background-color: #009da7; }
+.stat { font-size: 17px; -unity-font-style: bold; }
 .stat.teal { -unity-text-align: middle-right; }
 .overlay { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-color: rgba(0,0,0,0.4); align-items: center; justify-content: center; padding: 30px; }
 .dialog { width: 100%; max-width: 630px; border-width: 2px; border-color: #111111; background-color: white; padding: 28px; }

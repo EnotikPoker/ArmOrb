@@ -17,9 +17,10 @@ MonoBehaviour:
   largeSize: 10
   orbRadius: 0.55
   moveSpeed: 6.4
-  gravity: 9.8
+  gravity: 20
   restitution: 1
-  minimumFloorBounce: 8
+  floorBounceHeight: 0.85
+  minimumHorizontalSpeed: 0.4
   simulationHz: 120
   playerColor: {r: 1, g: 0.38431373, b: 0.41568628, a: 1}
   enemyColor: {r: 0, g: 0.827451, b: 0.8627451, a: 1}

@@ -12,6 +12,7 @@ namespace ArmOrb
         Button sound,pause;
         Label timer;
         readonly Label[] hp=new Label[2],stats=new Label[2],poison=new Label[2];
+        readonly VisualElement[] reload=new VisualElement[2];
         readonly List<(Button button,float speed)> speedButtons=new List<(Button,float)>();
         Rect previousSafe;
         Vector2Int previousSize;
@@ -37,12 +38,14 @@ namespace ArmOrb
         public void ShowSetup()
         {
             NewPage();
-            var header=Element(app,"row header"); Text(header,"ARMORB","logo"); Text(header,"0.2","version");
-            var content=Element(app,"setup-content");
+            var header=Element(app,"row header"); Text(header,"ARMORB","logo"); Text(header,"0.3","version");
+            var scroll=new ScrollView(ScrollViewMode.Vertical); scroll.AddToClassList("setup-scroll"); app.Add(scroll);
+            var content=Element(scroll.contentContainer,"setup-content");
             var cards=Element(content,"row fighter-cards");
             for(int i=0;i<2;i++) AddWeaponCard(cards,i);
-            Text(content,"Арена","setting-label");
-            var sizes=Element(content,"row segments");
+            var options=Element(content,"setup-options");
+            Text(options,"Арена","setting-label");
+            var sizes=Element(options,"row segments");
             string[] names={"Маленькая","Средняя","Большая"};
             var buttons=new Button[3];
             for(int i=0;i<3;i++)
@@ -55,9 +58,9 @@ namespace ArmOrb
                 },"segment");
                 Selected(buttons[i],(int)game.Options.arena==i);
             }
-            Text(content,"Скорость","setting-label"); AddSpeedControl(content);
+            Text(options,"Скорость","setting-label"); AddSpeedControl(options);
             var gravity=new Toggle("Гравитация"){value=game.Options.gravity}; gravity.AddToClassList("gravity");
-            gravity.RegisterValueChangedCallback(e=>{game.Options.gravity=e.newValue;game.Options.Save();}); content.Add(gravity);
+            gravity.RegisterValueChangedCallback(e=>{game.Options.gravity=e.newValue;game.Options.Save();}); options.Add(gravity);
             Button(content,"Начать",()=>game.StartFight(),"primary").name="start-fight";
             var footer=Element(app,"row footer");
             Button(footer,"Правила",ShowRules,"text-button"); sound=Button(footer,"",game.ToggleSound,"text-button"); RefreshSound();
@@ -66,17 +69,23 @@ namespace ArmOrb
         {
             var card=Element(parent,side==0?"fighter-card player":"fighter-card enemy");
             Text(card,side==0?"Игрок":"Противник",side==0?"side-name coral":"side-name teal");
-            var icon=new Image{scaleMode=ScaleMode.ScaleToFit,pickingMode=PickingMode.Ignore}; icon.AddToClassList("weapon-preview");card.Add(icon);
+            var preview=Element(card,"fighter-preview");
+            var orb=new Image{sprite=game.orbPrefab.body.sprite,scaleMode=ScaleMode.ScaleToFit,
+                tintColor=side==0?game.settings.playerColor:game.settings.enemyColor,pickingMode=PickingMode.Ignore};
+            orb.AddToClassList("preview-orb"); preview.Add(orb);
+            var icon=new Image{scaleMode=ScaleMode.ScaleToFit,pickingMode=PickingMode.Ignore}; icon.AddToClassList("weapon-preview");preview.Add(icon);
             var name=Text(card,"","weapon-name");
-            var row=Element(card,"row weapons");
-            var buttons=new Button[5];
+            var description=Text(card,"","weapon-description");
+            var row=Element(card,"weapons");
+            var buttons=new Button[game.weapons.Length];
             void Refresh()
             {
                 var definition=game.weapons[game.Selection[side]];
-                icon.sprite=definition.sprite; name.text=definition.displayName;
-                for(int i=0;i<5;i++) if(buttons[i]!=null) Selected(buttons[i],game.Selection[side]==i);
+                icon.sprite=definition.sprite; icon.style.display=definition.kind==WeaponKind.Unarmed?DisplayStyle.None:DisplayStyle.Flex;
+                name.text=definition.displayName; description.text=definition.description;
+                for(int i=0;i<buttons.Length;i++) if(buttons[i]!=null) Selected(buttons[i],game.Selection[side]==i);
             }
-            for(int i=0;i<5;i++)
+            for(int i=0;i<buttons.Length;i++)
             {
                 int selected=i;
                 buttons[i]=Button(row,"",()=>{game.Selection[side]=selected;Refresh();},"weapon-choice");
@@ -132,7 +141,11 @@ namespace ArmOrb
                 field.style.width=size;field.style.height=size;
             });
             var statRow=Element(app,"row stat-row");
-            stats[0]=Text(statRow,"","stat coral");stats[1]=Text(statRow,"","stat teal");
+            for(int i=0;i<2;i++)
+            {
+                var group=Element(statRow,"stat-group"); stats[i]=Text(group,"",i==0?"stat coral":"stat teal");
+                var track=Element(group,"reload-track"); reload[i]=Element(track,i==0?"reload-fill player-fill":"reload-fill enemy-fill");
+            }
             AddSpeedControl(app);
             var footer=Element(app,"row footer");
             string[] sizes={"Маленькая","Средняя","Большая"};
@@ -145,7 +158,9 @@ namespace ArmOrb
             float elapsed=game.Simulation.Elapsed;timer.text=$"{(int)elapsed/60:00}:{(int)elapsed%60:00}";
             for(int i=0;i<2;i++)
             {
-                var orb=game.Simulation.Orbs[i];hp[i].text=Mathf.CeilToInt(orb.Health.Current).ToString();stats[i].text=orb.Weapon.Stat;
+                var orb=game.Simulation.Orbs[i];hp[i].text=Mathf.CeilToInt(orb.Health.Current).ToString();stats[i].text=orb.Weapon.Kind==WeaponKind.Unarmed?$"СКОРОСТЬ  {game.settings.moveSpeed+orb.Weapon.SpeedBonus:0.#}":orb.Weapon.Stat;
+                reload[i].parent.style.visibility=orb.Weapon.IsRanged?Visibility.Visible:Visibility.Hidden;
+                reload[i].style.width=Length.Percent(100*(1-Mathf.Clamp01(orb.Weapon.ReloadRemaining/orb.Weapon.Cooldown)));
                 poison[i].text=orb.Health.PoisonPerSecond>0?$"Яд −{orb.Health.PoisonPerSecond:0.#}/с":"";
             }
         }
@@ -179,7 +194,12 @@ namespace ArmOrb
             string[] rules={"Меч: +1 к урону за попадание.","Копьё: +0,5 радиуса к длине за попадание.",
                 "Клинок: +30°/с к вращению за попадание.","Коса: +1 к урону яда в секунду на цели за попадание. Яд действует до конца боя.",
                 "Щит: возвращает прямой урон при блоке. Каждый блок добавляет 25 процентных пунктов к возврату.",
-                "Урон наносит всё видимое оружие. Для повторного удара нужен разрыв контакта. Усиления сбрасываются в новом бою."};
+                "Безоружный: урон телом 1, +0,4 к скорости за попадание.",
+                "Лук: выстрел по вращению раз в секунду. Каждое попадание добавляет стрелу в следующие залпы.",
+                "Посох: выстрел каждые 1,5 с. Огненный шар взрывается о тело, стену или щит. Расширяющееся кольцо наносит 1 урон один раз; попадание увеличивает радиус следующих волн на 0,275.",
+                "Сюрикен: бросок раз в секунду, 1 отскок от стены. Попадание добавляет отскок следующим броскам.",
+                "Щит уничтожает стрелы и сюрикены с возвратом урона. Волны проходят через щит. Собственные снаряды не опасны.",
+                "Урон наносит всё видимое контактное оружие. Для повторного удара нужен разрыв контакта. Усиления сбрасываются в новом бою."};
             foreach(string rule in rules) Text(scroll,rule,"rule");Button(card,"Закрыть",CloseOverlay,"primary");
         }
         public void UpdateSafeArea()
