@@ -1,13 +1,13 @@
-# ArmOrb — Android v0.3.0
+# ArmOrb — Android v0.4.0
 
-[Скачать APK v0.3.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.3.0.apk)
+[Скачать APK v0.4.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.4.0.apk)
 
-Девять вариантов оружия: меч, копьё, клинок, коса, щит, безоружный, лук, посох и сюрикен. Стрелы, огненные шары с кольцевыми взрывами, отражения от стен, более высокие отскоки и обновлённое меню с сетками 3×3.
+Физика по пяти референсам, разные скорости и контактная реакция оружия. Лук с последовательной очередью, арбалет с веером, щит с отражением снарядов и ростом ширины, безоружный с уроном от скорости и растущим пределом.
 
-Android 8.0+, ARM64, портретная ориентация. Development-сборка, versionCode 3, прежняя отладочная подпись. Устанавливается обновлением предыдущей версии без удаления данных.
+Android 8.0+, ARM64, портретная ориентация. Development-сборка, versionCode 4, прежняя отладочная подпись. Устанавливается обновлением без удаления данных. Проверено 63 EditMode-тестами и на Xiaomi/POCO 23122PCD1G (Android 16).
 
-[Исходный Unity-проект](https://github.com/EnotikPoker/ArmOrb/tree/e928013e024de54a17b25099a9b6ea93b837dcca) · [README](https://github.com/EnotikPoker/ArmOrb/blob/e928013e024de54a17b25099a9b6ea93b837dcca/README.md) · [Проверки](https://github.com/EnotikPoker/ArmOrb/blob/e928013e024de54a17b25099a9b6ea93b837dcca/docs/VALIDATION.md)
+[Исходный Unity-проект](https://github.com/EnotikPoker/ArmOrb/tree/3cac2e4c355fa2a6a91584058f5e67aff1ce440d) · [README](https://github.com/EnotikPoker/ArmOrb/blob/3cac2e4c355fa2a6a91584058f5e67aff1ce440d/README.md) · [Проверки](https://github.com/EnotikPoker/ArmOrb/blob/3cac2e4c355fa2a6a91584058f5e67aff1ce440d/docs/VALIDATION.md) · [Референсы](https://github.com/EnotikPoker/ArmOrb/blob/3cac2e4c355fa2a6a91584058f5e67aff1ce440d/docs/REFERENCE_PHYSICS.md)
 
-Коммит исходников: `e928013e024de54a17b25099a9b6ea93b837dcca`. SHA-256: `602acbdcbd4a62e1107526b57b97a70214f063e04a1d430457548e94940f001c`. Контрольные суммы всех APK — в `SHA256SUMS`.
+Коммит исходников: `3cac2e4c355fa2a6a91584058f5e67aff1ce440d`. SHA-256: `c0f0d6d809512374d7e3b52cbfa4120e2219086bbfdd0a57790b800320eeca6c`. Все контрольные суммы — в `SHA256SUMS`.
 
-Предыдущие сборки: [v0.2.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.2.0.apk) · [v0.1.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.1.0.apk).
+Предыдущие APK: [v0.3.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.3.0.apk) · [v0.2.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.2.0.apk) · [v0.1.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.1.0.apk).
