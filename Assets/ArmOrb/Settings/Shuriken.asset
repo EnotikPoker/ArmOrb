@@ -19,7 +19,6 @@ MonoBehaviour:
   reach: 2.6
   rotationSpeed: 300
   growth: 1
-  initialReflection: 1
   sprite: {fileID: 21300000, guid: c8d95272820a9ac60a613c0e42a472cb, type: 3}
   prefab: {fileID: 895247796616531840, guid: be06d01cf3bcdcbc09e7efe6b629acd9, type: 3}
   shape: {fileID: 11400000, guid: 863ea31a254864d14bc37f246cfc368c, type: 2}
@@ -27,4 +26,7 @@ MonoBehaviour:
   projectileSpeed: 11
   blastRadius: 1.1
   waveSpeed: 6
+  burstInterval: 0.06
+  unarmedMaxSpeed: 3
+  unarmedSpeedUnit: 1.6
   projectileSprite: {fileID: 21300000, guid: c8d95272820a9ac60a613c0e42a472cb, type: 3}

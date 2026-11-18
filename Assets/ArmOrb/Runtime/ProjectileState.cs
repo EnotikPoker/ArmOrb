@@ -4,7 +4,7 @@ namespace ArmOrb
 {
     public sealed class ProjectileState
     {
-        public int Id, Owner, Bounces;
+        public int Id, Owner, Bounces, Reflections;
         public WeaponKind Kind;
         public Vector2 Position, PreviousPosition, Velocity;
         public float Damage, Radius, HalfShaft, BlastRadius, WaveSpeed, Age;

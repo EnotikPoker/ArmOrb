@@ -39,15 +39,15 @@ namespace ArmOrb
                 return 2;
             }
             Vector2 offset = new Vector2(0.85f,0);
-            Vector2 size = new Vector2(weapon.Reach - 0.85f, weapon.Kind == WeaponKind.Scythe ? 3 : 1.6f);
-            if (weapon.Kind == WeaponKind.Shield) { offset.x = 1.1f; size = new Vector2(0.75f,2.1f); }
+            Vector2 size = new Vector2(weapon.Reach - 0.85f, weapon.Kind == WeaponKind.Scythe ? 3 : weapon.Kind == WeaponKind.Blade ? 0.6f : 1.6f);
+            if (weapon.Kind == WeaponKind.Shield) { offset.x = 1.1f; size = new Vector2(0.75f,weapon.ShieldWidth); }
             parts[0] = new WeaponPartPose(shape.artwork, offset, size); return 1;
         }
         public static void Fill(CombatantState orb, float radius, WeaponColliderBuffer buffer)
             => Fill(orb.Weapon, radius, orb.Position, orb.Angle, buffer);
         public static void Fill(WeaponState weapon, float radius, Vector2 position, float angle, WeaponColliderBuffer buffer)
         {
-            if (!weapon.IsMelee) { buffer.Count = 0; buffer.Bounds = new Rect(); return; }
+            if (weapon.Kind==WeaponKind.Unarmed) { buffer.Count = 0; buffer.Bounds = new Rect(); return; }
             float radians = angle * Mathf.Deg2Rad;
             Vector2 axis = new Vector2(Mathf.Cos(radians),Mathf.Sin(radians)), normal = new Vector2(-axis.y,axis.x);
             int parts = GetParts(weapon, buffer.Parts); buffer.Count = 0;
@@ -82,6 +82,17 @@ namespace ArmOrb
             }
             return false;
         }
+        public static bool BodyContact(WeaponColliderBuffer buffer,Vector2 centre,float radius,out Vector2 point,out Vector2 normal)
+        {
+            for(int i=0;i<buffer.Count;i++)
+            {
+                var b=buffer.Boxes[i];Vector2 d=centre-b.Centre;
+                point=b.Centre+b.X*Mathf.Clamp(Vector2.Dot(d,b.X),-b.Half.x,b.Half.x)+b.Y*Mathf.Clamp(Vector2.Dot(d,b.Y),-b.Half.y,b.Half.y);
+                if((centre-point).sqrMagnitude>radius*radius) continue;
+                normal=OrbMotion.Direction(centre-point,b.Y);return true;
+            }
+            point=normal=Vector2.zero;return false;
+        }
         static float PointRectDistance(Vector2 point, Rect rect)
         {
             float x=Mathf.Max(0,Mathf.Max(rect.xMin-point.x,point.x-rect.xMax));
@@ -96,6 +107,26 @@ namespace ArmOrb
                 if (BoxesTouch(a.Boxes[i],b.Boxes[j])) return true;
             return false;
         }
+        public static bool Contact(WeaponColliderBuffer a,WeaponColliderBuffer b,out Vector2 point,out Vector2 normal)
+        {
+            for(int i=0;i<a.Count;i++) for(int j=0;j<b.Count;j++)
+            {
+                var x=a.Boxes[i];var y=b.Boxes[j];
+                if(!BoxesTouch(x,y)) continue;
+                Vector2 delta=y.Centre-x.Centre; normal=x.X; float penetration=float.PositiveInfinity;
+                for(int axis=0;axis<4;axis++)
+                {
+                    Vector2 n=axis==0?x.X:axis==1?x.Y:axis==2?y.X:y.Y;
+                    float extent=Projection(x,n)+Projection(y,n)-Mathf.Abs(Vector2.Dot(delta,n));
+                    if(extent<penetration) { penetration=extent;normal=Vector2.Dot(delta,n)>=0?n:-n; }
+                }
+                point=(Support(x,normal)+Support(y,-normal))*0.5f;return true;
+            }
+            point=normal=Vector2.zero;return false;
+        }
+        static float Projection(WeaponBox b,Vector2 n) => Mathf.Abs(Vector2.Dot(b.X,n))*b.Half.x+Mathf.Abs(Vector2.Dot(b.Y,n))*b.Half.y;
+        static float Sign(float x) => Mathf.Abs(x)<0.000001f?0:Mathf.Sign(x);
+        static Vector2 Support(WeaponBox b,Vector2 n) => b.Centre+b.X*b.Half.x*Sign(Vector2.Dot(b.X,n))+b.Y*b.Half.y*Sign(Vector2.Dot(b.Y,n));
         public static bool BoxesTouch(WeaponBox a, WeaponBox b)
         {
             Vector2 d=b.Centre-a.Centre;

@@ -50,6 +50,7 @@ namespace ArmOrb
             {
                 var item = Get(p.Id, false);
                 item.Sprite.sprite = weapons[(int)p.Kind].projectileSprite;
+                item.Sprite.color=p.Reflections>0?(p.Owner==0?new Color32(255,98,106,255):new Color32(0,211,220,255)):Color.white;
                 item.Root.transform.position = Vector2.Lerp(p.PreviousPosition, p.Position, alpha);
                 float angle = Mathf.Atan2(p.Velocity.y, p.Velocity.x) * Mathf.Rad2Deg;
                 item.Root.transform.rotation = Quaternion.Euler(0, 0, p.Kind == WeaponKind.Shuriken ? p.Age * 900 : angle);

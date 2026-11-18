@@ -30,12 +30,12 @@ namespace ArmOrb.Tests
             target.Damage(target.PoisonPerSecond * 8); Assert.That(target.Current, Is.EqualTo(76));
             Assert.That(target.PoisonPerSecond, Is.EqualTo(3));
         }
-        [Test] public void ShieldUsesCurrentReflectionThenIncreasesIt()
+        [Test] public void ShieldReturnsExactlyIncomingDamageAndGrowsAfterDamage()
         {
             var shield = Weapon(WeaponKind.Shield); var attacker = new HealthState(100);
-            attacker.Damage(shield.Block(4)); attacker.Damage(shield.Block(4));
-            Assert.That(attacker.Current, Is.EqualTo(91)); Assert.That(shield.Reflection, Is.EqualTo(1.5f));
-            Assert.That(shield.Hits, Is.Zero); Assert.That(shield.Blocks, Is.EqualTo(2));
+            attacker.Damage(shield.Block(4)); shield.OnHit(attacker); attacker.Damage(shield.Block(4)); shield.OnHit(attacker);
+            Assert.That(attacker.Current, Is.EqualTo(92)); Assert.That(shield.Reflection, Is.EqualTo(1));
+            Assert.That(shield.ShieldWidth, Is.EqualTo(2.6f).Within(0.0001)); Assert.That(shield.Blocks, Is.EqualTo(2));
         }
         [Test] public void FreshFightDoesNotRetainPoisonOrGrowth()
         {
@@ -112,13 +112,13 @@ namespace ArmOrb.Tests
         [TestCase(0,0)] [TestCase(0,1)] [TestCase(0,2)] [TestCase(0,3)] [TestCase(0,4)]
         [TestCase(1,1)] [TestCase(1,2)] [TestCase(1,3)] [TestCase(1,4)]
         [TestCase(2,2)] [TestCase(2,3)] [TestCase(2,4)]
-        [TestCase(3,3)] [TestCase(3,4)] [TestCase(4,4)]
+        [TestCase(3,3)] [TestCase(3,4)]
         public void EveryMatchupMakesProgressAndStaysValid(int first, int second)
         {
             int finished = 0;
             for (int seed = 1; seed <= 3; seed++)
             {
-                // Low health makes completion meaningful even for shield mirror matches.
+                // A shield mirror has no attack and is verified separately as an intentional stalemate.
                 var sim = new ArenaSimulation(Weapon((WeaponKind)first), Weapon((WeaponKind)second),10,10,seed);
                 for(int tick=0; tick<120*240 && sim.Result==MatchResult.InProgress; tick++)
                 {

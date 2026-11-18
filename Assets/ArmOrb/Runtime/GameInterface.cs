@@ -38,7 +38,7 @@ namespace ArmOrb
         public void ShowSetup()
         {
             NewPage();
-            var header=Element(app,"row header"); Text(header,"ARMORB","logo"); Text(header,"0.3","version");
+            var header=Element(app,"row header"); Text(header,"ARMORB","logo"); Text(header,"0.4","version");
             var scroll=new ScrollView(ScrollViewMode.Vertical); scroll.AddToClassList("setup-scroll"); app.Add(scroll);
             var content=Element(scroll.contentContainer,"setup-content");
             var cards=Element(content,"row fighter-cards");
@@ -158,9 +158,9 @@ namespace ArmOrb
             float elapsed=game.Simulation.Elapsed;timer.text=$"{(int)elapsed/60:00}:{(int)elapsed%60:00}";
             for(int i=0;i<2;i++)
             {
-                var orb=game.Simulation.Orbs[i];hp[i].text=Mathf.CeilToInt(orb.Health.Current).ToString();stats[i].text=orb.Weapon.Kind==WeaponKind.Unarmed?$"СКОРОСТЬ  {game.settings.moveSpeed+orb.Weapon.SpeedBonus:0.#}":orb.Weapon.Stat;
+                var orb=game.Simulation.Orbs[i];hp[i].text=Mathf.CeilToInt(orb.Health.Current).ToString();stats[i].text=orb.Weapon.Stat;
                 reload[i].parent.style.visibility=orb.Weapon.IsRanged?Visibility.Visible:Visibility.Hidden;
-                reload[i].style.width=Length.Percent(100*(1-Mathf.Clamp01(orb.Weapon.ReloadRemaining/orb.Weapon.Cooldown)));
+                reload[i].style.width=Length.Percent(orb.Weapon.IsBursting?0:100*(1-Mathf.Clamp01(orb.Weapon.ReloadRemaining/orb.Weapon.Cooldown)));
                 poison[i].text=orb.Health.PoisonPerSecond>0?$"Яд −{orb.Health.PoisonPerSecond:0.#}/с":"";
             }
         }
@@ -192,13 +192,14 @@ namespace ArmOrb
         {
             var card=Dialog("Правила");var scroll=new ScrollView();scroll.style.maxHeight=450;card.Add(scroll);
             string[] rules={"Меч: +1 к урону за попадание.","Копьё: +0,5 радиуса к длине за попадание.",
-                "Клинок: +30°/с к вращению за попадание.","Коса: +1 к урону яда в секунду на цели за попадание. Яд действует до конца боя.",
-                "Щит: возвращает прямой урон при блоке. Каждый блок добавляет 25 процентных пунктов к возврату.",
-                "Безоружный: урон телом 1, +0,4 к скорости за попадание.",
-                "Лук: выстрел по вращению раз в секунду. Каждое попадание добавляет стрелу в следующие залпы.",
-                "Посох: выстрел каждые 1,5 с. Огненный шар взрывается о тело, стену или щит. Расширяющееся кольцо наносит 1 урон один раз; попадание увеличивает радиус следующих волн на 0,275.",
+                "Клинок: +573°/с к вращению за попадание.","Коса: +1 к урону яда в секунду на цели за попадание. Яд действует до конца боя.",
+                "Щит: возвращает 100% урона, сам не бьёт. Нанесённый возвращённый урон увеличивает ширину на 0,25r.",
+                "Безоружный: урон равен целой части скорости перед ударом, минимум 1. Начальный предел скорости 3, каждое попадание увеличивает его на 0,5.",
+                "Лук: очередь стрел с интервалом 0,06 с. Направление удерживается до конца очереди. Попадание добавляет стрелу в следующую очередь; перезарядка после последней стрелы — 1 с.",
+                "Арбалет: одновременный веер 60°, перезарядка 1 с. Попадание добавляет стрелу в следующий залп.",
+                "Посох: выстрел каждые 1,5 с. Огненный шар взрывается о стену или тело; щит отражает снаряд. Расширяющееся кольцо наносит 1 урон один раз; попадание увеличивает радиус следующих волн на 0,275.",
                 "Сюрикен: бросок раз в секунду, 1 отскок от стены. Попадание добавляет отскок следующим броскам.",
-                "Щит уничтожает стрелы и сюрикены с возвратом урона. Волны проходят через щит. Собственные снаряды не опасны.",
+                "Щит отражает стрелы, огненные шары и сюрикены: они меняют владельца и направление. Рост ширины — после их попадания по противнику. Волны проходят через щит; собственные снаряды не опасны.",
                 "Урон наносит всё видимое контактное оружие. Для повторного удара нужен разрыв контакта. Усиления сбрасываются в новом бою."};
             foreach(string rule in rules) Text(scroll,rule,"rule");Button(card,"Закрыть",CloseOverlay,"primary");
         }

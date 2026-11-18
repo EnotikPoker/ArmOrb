@@ -13,24 +13,24 @@ namespace ArmOrb
         public IReadOnlyList<WaveState> Waves => waves;
         int nextEffectId;
 
-        void Fire(int side)
+        void Fire(int side, bool single = false)
         {
             var orb = Orbs[side]; var weapon = orb.Weapon;
-            int count = weapon.Kind == WeaponKind.Bow ? weapon.ArrowCount : 1;
+            int count = weapon.Kind == WeaponKind.Crossbow ? weapon.ArrowCount : 1;
             for (int i = 0; i < count; i++)
             {
-                float angle = orb.Angle + (count == 1 ? 0 : -30 + 60f * i / (count - 1));
+                float angle = (single ? weapon.BurstAngle : orb.Angle) + (count == 1 ? 0 : -30 + 60f * i / (count - 1));
                 Vector2 direction = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad));
                 var p = freeProjectiles.Count > 0 ? freeProjectiles.Pop() : new ProjectileState();
                 p.Id = ++nextEffectId; p.Owner = side; p.Kind = weapon.Kind;
-                p.Radius = weapon.Kind == WeaponKind.Bow ? 0.06f : weapon.Kind == WeaponKind.Staff ? 0.16f : 0.18f;
-                p.HalfShaft = weapon.Kind == WeaponKind.Bow ? 0.14f : 0;
+                p.Radius = (weapon.Kind == WeaponKind.Bow || weapon.Kind == WeaponKind.Crossbow) ? 0.06f : weapon.Kind == WeaponKind.Staff ? 0.16f : 0.18f;
+                p.HalfShaft = (weapon.Kind == WeaponKind.Bow || weapon.Kind == WeaponKind.Crossbow) ? 0.14f : 0;
                 Vector2 limit = Vector2.one*(Size*0.5f-p.Radius)-new Vector2(Mathf.Abs(direction.x),Mathf.Abs(direction.y))*p.HalfShaft;
                 Vector2 muzzle = orb.Position + direction * (Radius + p.Radius + 0.04f);
                 p.Position = p.PreviousPosition = new Vector2(Mathf.Clamp(muzzle.x, -limit.x, limit.x), Mathf.Clamp(muzzle.y, -limit.y, limit.y));
                 p.Velocity = direction * weapon.ProjectileSpeed; p.Damage = weapon.Damage;
                 p.Bounces = weapon.Bounces; p.BlastRadius = weapon.BlastRadius; p.WaveSpeed = weapon.WaveSpeed;
-                p.Age = 0; p.Active = true; projectiles.Add(p);
+                p.Age = 0; p.Reflections = 0; p.Active = true; projectiles.Add(p);
             }
             Emit(CombatEventKind.Shot, orb.Position, side);
         }
@@ -48,9 +48,9 @@ namespace ArmOrb
             for (int n = 0; n < projectiles.Count; n++)
             {
                 var p = projectiles[n]; p.Age += dt;
-                float remaining = dt, offset = 0;
+                float remaining = dt, offset = 0; int contacts=0;
                 // Each segment ends at the earliest body, shield or wall contact.
-                while (p.Active && remaining > 0.00000001f)
+                while (p.Active && remaining > 0.00000001f && contacts++ < 8)
                 {
                     int target = 1 - p.Owner;
                     Vector2 from = p.Position, to = from + p.Velocity * remaining;
@@ -69,14 +69,18 @@ namespace ArmOrb
                     p.Position = Vector2.Lerp(from, to, impact);
                     if (shield <= body && shield <= wall)
                     {
-                        if (p.Kind == WeaponKind.Staff) Explode(p);
-                        else
-                        {
-                            float returned = Orbs[target].Weapon.Block(p.Damage);
-                            Orbs[p.Owner].Health.Damage(returned);
-                            Emit(CombatEventKind.Block, p.Position, p.Owner, returned);
-                        }
-                        p.Active = false;
+                        // Transfer the projectile, retaining its kind, damage, blast radius and bounce budget.
+                        var defender = Orbs[target]; defender.Weapon.Block(0);
+                        float radians = defender.Angle * Mathf.Deg2Rad;
+                        Vector2 normal = new Vector2(Mathf.Cos(radians), Mathf.Sin(radians));
+                        Vector2 away = OrbMotion.Direction(p.Position-defender.Position,normal);
+                        Vector2 outgoing = Vector2.Reflect(p.Velocity,normal);
+                        if(Vector2.Dot(outgoing,away)<0) outgoing=Vector2.Reflect(p.Velocity,away);
+                        p.Velocity=outgoing; p.Owner=target; p.Reflections++;
+                        p.Position+=OrbMotion.Direction(outgoing,away)*0.0001f;
+                        Emit(CombatEventKind.Block,p.Position,target);
+                        offset+=remaining*impact; remaining*=1-impact;
+                        continue;
                     }
                     else if (body <= wall)
                     {
@@ -116,9 +120,29 @@ namespace ArmOrb
             {
                 var weapon = Orbs[side].Weapon;
                 if (!weapon.IsRanged) continue;
+                if(weapon.IsBursting)
+                {
+                    weapon.BurstDelay-=dt;
+                    if(weapon.BurstDelay<=0) ReleaseBowArrow(side);
+                    continue;
+                }
                 weapon.ReloadRemaining -= dt;
-                if (weapon.ReloadRemaining <= 0) { Fire(side); weapon.ReloadRemaining += weapon.Cooldown; }
+                if (weapon.ReloadRemaining <= 0)
+                {
+                    if(weapon.Kind==WeaponKind.Bow)
+                    {
+                        weapon.BurstRemaining=weapon.ArrowCount; weapon.BurstAngle=Orbs[side].Angle;
+                        weapon.BurstDelay=0;ReleaseBowArrow(side);
+                    }
+                    else { Fire(side); weapon.ReloadRemaining+=weapon.Cooldown; }
+                }
             }
+        }
+        void ReleaseBowArrow(int side)
+        {
+            var weapon=Orbs[side].Weapon;Fire(side,true);weapon.BurstRemaining--;
+            if(weapon.BurstRemaining==0) weapon.ReloadRemaining=weapon.Cooldown;
+            else weapon.BurstDelay+=weapon.BurstInterval;
         }
         static float WallTime(float from, float to, float limit)
         {
@@ -130,10 +154,14 @@ namespace ArmOrb
         void DamageHit(int attacker, float damage, Vector2 position)
         {
             var orb = Orbs[attacker]; var target = Orbs[1 - attacker];
-            float before = Speed + orb.Weapon.SpeedBonus;
-            target.Health.Damage(damage); orb.Weapon.OnHit(target.Health);
-            if (orb.Weapon.Kind == WeaponKind.Unarmed && before > 0)
-                orb.Velocity *= (Speed + orb.Weapon.SpeedBonus) / before;
+            float beforeHealth=target.Health.Current;
+            target.Health.Damage(damage);
+            if(target.Health.Current<beforeHealth)
+            {
+                orb.Weapon.OnHit(target.Health);
+                if(orb.Weapon.Kind==WeaponKind.Unarmed && !UsesGravity && Speed>0)
+                    orb.Velocity=OrbMotion.Direction(orb.Velocity,Vector2.right)*orb.Weapon.UnarmedWorldLimit;
+            }
             Emit(CombatEventKind.Hit, position, 1 - attacker, damage);
         }
     }

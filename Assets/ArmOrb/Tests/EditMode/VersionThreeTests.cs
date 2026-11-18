@@ -6,7 +6,7 @@ namespace ArmOrb.Tests
     public sealed class VersionThreeTests
     {
         static WeaponState W(WeaponKind kind, float cooldown=1, float projectileSpeed=14) => new WeaponState(kind,
-            rotationSpeed:0, growth:kind==WeaponKind.Unarmed?0.4f:kind==WeaponKind.Staff?0.275f:kind==WeaponKind.Shield?0.25f:1,
+            rotationSpeed:0, growth:kind==WeaponKind.Unarmed?0.5f:kind==WeaponKind.Staff?0.275f:kind==WeaponKind.Shield?0.25f:1,
             cooldown:cooldown,projectileSpeed:projectileSpeed);
         static ArenaSimulation Still(WeaponKind first,WeaponKind second=WeaponKind.Bow,float cooldown=1)
         {
@@ -27,7 +27,7 @@ namespace ArmOrb.Tests
         static void Run(ArenaSimulation sim,float seconds)
         { for(int i=0;i<Mathf.CeilToInt(seconds*120);i++)sim.Step(1f/120); }
 
-        [Test] public void UnarmedBodyHitsBothSidesOnceAndKeepsOneDamage()
+        [Test] public void StationaryUnarmedContactDealsMinimumDamageAndGrowsCap()
         {
             var sim=Still(WeaponKind.Unarmed,WeaponKind.Unarmed);
             sim.Orbs[0].Position=new Vector2(-0.5f,0);sim.Orbs[1].Position=new Vector2(0.5f,0);
@@ -35,25 +35,27 @@ namespace ArmOrb.Tests
             for(int i=0;i<2;i++)
             {
                 Assert.That(sim.Orbs[i].Health.Current,Is.EqualTo(99));
-                Assert.That(sim.Orbs[i].Weapon.SpeedBonus,Is.EqualTo(0.4f));
+                Assert.That(sim.Orbs[i].Weapon.SpeedBonus,Is.EqualTo(0.5f));
                 Assert.That(sim.Orbs[i].Weapon.Damage,Is.EqualTo(1));
             }
             sim.Orbs[0].Position=new Vector2(-2,0);sim.Step(1f/120);
             sim.Orbs[0].Position=sim.Orbs[1].Position-Vector2.right;
             sim.Step(1f/120);Assert.That(sim.Orbs[0].Weapon.Hits,Is.EqualTo(2));
         }
-        [Test] public void UnarmedGrowthImmediatelyIncreasesVelocityAndSurvivesBodyBounce()
+        [Test] public void UnarmedUsesIncomingSpeedForDamageAndRaisesItsCap()
         {
             var sim=new ArenaSimulation(W(WeaponKind.Unarmed),W(WeaponKind.Bow));
             sim.Orbs[0].Position=new Vector2(-0.5f,0);sim.Orbs[1].Position=new Vector2(0.5f,0);
             sim.Orbs[0].Velocity=Vector2.right*sim.Speed;sim.Orbs[1].Velocity=Vector2.left*sim.Speed;
             sim.Step(1f/120);
-            Assert.That(sim.Orbs[0].Velocity.magnitude,Is.EqualTo(6.8f).Within(0.001f));
+            Assert.That(sim.Orbs[0].Weapon.UnarmedMaxSpeed,Is.EqualTo(3.5f));
+            Assert.That(sim.Orbs[1].Health.Current,Is.EqualTo(97));
+            Assert.That(sim.Orbs[0].Velocity.magnitude,Is.EqualTo(5.6f).Within(0.001f));
             Assert.That(sim.Orbs[1].Velocity.magnitude,Is.EqualTo(6.4f).Within(0.001f));
         }
-        [Test] public void BowUsesCooldownAndSnapshotsSimultaneousFan()
+        [Test] public void CrossbowUsesCooldownAndSnapshotsSimultaneousFan()
         {
-            var sim=Still(WeaponKind.Bow);
+            var sim=Still(WeaponKind.Crossbow);
             Run(sim,0.5f);Assert.That(sim.Projectiles.Count,Is.Zero);
             sim.Orbs[0].Weapon.OnHit(sim.Orbs[1].Health);sim.Orbs[0].Weapon.OnHit(sim.Orbs[1].Health);
             Shot(sim);Assert.That(sim.Projectiles.Count,Is.EqualTo(3));
@@ -73,7 +75,7 @@ namespace ArmOrb.Tests
             Assert.That(sim.Projectiles.Count,Is.Zero);
             Assert.That(ProjectileCollision.Circle(new Vector2(-1,1),new Vector2(1,-1),0.1f),Is.LessThan(1));
         }
-        [Test] public void ShieldConsumesArrowAndReturnsDamageWithoutGrowingShooter()
+        [Test] public void ShieldReflectsArrowAndReturnsDamageWithoutGrowingShooter()
         {
             var sim=Still(WeaponKind.Bow,WeaponKind.Shield);Shot(sim);Run(sim,0.5f);
             Assert.That(sim.Orbs[1].Health.Current,Is.EqualTo(100));
@@ -110,13 +112,14 @@ namespace ArmOrb.Tests
             Assert.That(sim.Projectiles.Count,Is.Zero);Assert.That(sim.Waves.Count,Is.Zero);
             Assert.That(Shot(sim).BlastRadius,Is.EqualTo(1.375f).Within(0.00001));
         }
-        [Test] public void StaffExplodesOnShieldAndWavePassesThroughWithoutReflection()
+        [Test] public void StaffProjectileIsReflectedAndItsWaveBelongsToShield()
         {
             var sim=Still(WeaponKind.Staff,WeaponKind.Shield);Shot(sim);Run(sim,0.7f);
-            Assert.That(sim.Orbs[0].Health.Current,Is.EqualTo(100));
-            Assert.That(sim.Orbs[1].Health.Current,Is.EqualTo(99));
-            Assert.That(sim.Orbs[1].Weapon.Blocks,Is.Zero);
-            Assert.That(sim.Orbs[0].Weapon.Hits,Is.EqualTo(1));
+            Assert.That(sim.Orbs[0].Health.Current,Is.EqualTo(99));
+            Assert.That(sim.Orbs[1].Health.Current,Is.EqualTo(100));
+            Assert.That(sim.Orbs[1].Weapon.Blocks,Is.EqualTo(1));
+            Assert.That(sim.Orbs[0].Weapon.Hits,Is.Zero);
+            Assert.That(sim.Orbs[1].Weapon.ShieldWidth,Is.EqualTo(2.35f).Within(0.001));
         }
         [Test] public void RingDetectsMovingCrossingsAndDoesNotDamageAlreadyPassedInterior()
         {
@@ -158,16 +161,16 @@ namespace ArmOrb.Tests
             sim.Step(1f/120);Assert.That(sim.Result,Is.EqualTo(MatchResult.Draw));
             float elapsed=sim.Elapsed;sim.Step(1);Assert.That(sim.Elapsed,Is.EqualTo(elapsed));
         }
-        [Test] public void GravityMaintainsLateralMotionAndArenaRelativeBounceHeight()
+        [Test] public void GravityAllowsLowBouncesWithoutHorizontalForcing()
         {
             foreach(float size in new[]{6f,8,10})
             {
                 var sim=new ArenaSimulation(W(WeaponKind.Bow),W(WeaponKind.Bow),9999,9999,size:size,gravity:true);
                 sim.Orbs[0].Position=new Vector2(-2,-size/2+sim.Radius+0.001f);sim.Orbs[0].Velocity=new Vector2(0,-1);
                 sim.Step(1f/120);
-                Assert.That(Mathf.Abs(sim.Orbs[0].Velocity.x),Is.GreaterThanOrEqualTo(6.4f*0.4f-0.001));
-                Assert.That(sim.Orbs[0].Velocity.y,Is.GreaterThan(sim.MinimumBounce-0.2f));
-                Assert.That(sim.MinimumBounce*sim.MinimumBounce/(2*sim.Gravity),Is.EqualTo((size-2*sim.Radius)*0.85f).Within(0.001));
+                Assert.That(sim.Orbs[0].Velocity.x,Is.Zero);
+                Assert.That(sim.Orbs[0].Velocity.y,Is.InRange(0.5f,1.5f));
+                Assert.That(sim.MinimumBounce,Is.Zero);
             }
         }
         [Test] public void ShieldBlockDoesNotGiveUnarmedGrowth()
@@ -191,7 +194,7 @@ namespace ArmOrb.Tests
         }
         [Test] public void AllNewMatchupsProduceDamageAndStayBounded()
         {
-            for(int a=0;a<9;a++)for(int b=Mathf.Max(a,5);b<9;b++)
+            for(int a=0;a<10;a++)for(int b=Mathf.Max(a,5);b<10;b++)
             {
                 var sim=new ArenaSimulation(W((WeaponKind)a),W((WeaponKind)b),20,20,seed:37+a*9+b,size:8,gravity:true);
                 for(int tick=0;tick<120*45 && sim.Result==MatchResult.InProgress;tick++)sim.Step(1f/120);

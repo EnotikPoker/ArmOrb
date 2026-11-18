@@ -16,13 +16,21 @@ namespace ArmOrb
     public sealed class WeaponState
     {
         public WeaponKind Kind { get; }
-        public float Damage { get; private set; }
+        float baseDamage;
+        public float Damage { get => Kind==WeaponKind.Unarmed?Mathf.Max(1,Mathf.Floor(CurrentSpeed+0.00001f)):baseDamage; private set => baseDamage=value; }
+        public float CurrentSpeed { get; private set; }
+        readonly float initialUnarmedMaxSpeed;
+        public float UnarmedMaxSpeed => initialUnarmedMaxSpeed+SpeedBonus;
+        public float SpeedUnit { get; }
+        public float UnarmedWorldLimit => UnarmedMaxSpeed*SpeedUnit;
+        public void MeasureSpeed(Vector2 velocity) => CurrentSpeed=velocity.magnitude/(Kind==WeaponKind.Unarmed?SpeedUnit:1);
         public float Reach { get; private set; }
         public float RotationSpeed { get; private set; }
-        public float Reflection { get; private set; }
+        public float Reflection => 1;
+        public float ShieldWidth { get; private set; } = 2.1f;
         public float Growth { get; }
         public WeaponShapeDefinition Shape { get; }
-        public bool IsRanged => Kind == WeaponKind.Bow || Kind == WeaponKind.Staff || Kind == WeaponKind.Shuriken;
+        public bool IsRanged => Kind == WeaponKind.Bow || Kind == WeaponKind.Staff || Kind == WeaponKind.Shuriken || Kind == WeaponKind.Crossbow;
         public bool IsMelee => !IsRanged && Kind != WeaponKind.Unarmed;
         public float SpeedBonus { get; private set; }
         public int ArrowCount { get; private set; } = 1;
@@ -32,17 +40,24 @@ namespace ArmOrb
         public float ProjectileSpeed { get; }
         public float WaveSpeed { get; }
         public float ReloadRemaining;
+        public float BurstInterval { get; }
+        public int BurstRemaining;
+        public float BurstDelay;
+        public float BurstAngle;
+        public bool IsBursting => Kind == WeaponKind.Bow && BurstRemaining > 0;
         public int Hits { get; private set; }
         public int Blocks { get; private set; }
         public WeaponState(WeaponKind kind, float damage = 1, float reach = 2.6f,
             float rotationSpeed = 300, float growth = 1, float reflection = 1, WeaponShapeDefinition shape = null,
-            float cooldown = 1, float projectileSpeed = 14, float blastRadius = 1.1f, float waveSpeed = 6)
+            float cooldown = 1, float projectileSpeed = 14, float blastRadius = 1.1f, float waveSpeed = 6, float burstInterval = 0.06f, float unarmedMaxSpeed = 3, float unarmedSpeedUnit = 1.6f)
         {
-            Kind = kind; Damage = damage; Reach = reach;
-            RotationSpeed = rotationSpeed; Growth = growth; Reflection = reflection;
+            Kind = kind; Damage = kind == WeaponKind.Shield ? 0 : damage; Reach = reach;
+            RotationSpeed = rotationSpeed; Growth = growth;
             Shape = shape ? shape : WeaponShapeDefinition.Get(kind);
             Cooldown = Mathf.Max(0.05f, cooldown); ProjectileSpeed = Mathf.Max(0.1f, projectileSpeed);
             BlastRadius = Mathf.Max(0.01f, blastRadius); WaveSpeed = Mathf.Max(0.1f, waveSpeed);
+            initialUnarmedMaxSpeed=Mathf.Max(0.1f,unarmedMaxSpeed); SpeedUnit=Mathf.Max(0.1f,unarmedSpeedUnit);
+            BurstInterval = Mathf.Max(0.01f, burstInterval);
             ReloadRemaining = IsRanged ? Cooldown : 0;
         }
         public void OnHit(HealthState target)
@@ -51,7 +66,9 @@ namespace ArmOrb
             switch (Kind)
             {
                 case WeaponKind.Unarmed: SpeedBonus += Growth; break;
-                case WeaponKind.Bow: ArrowCount++; break;
+                case WeaponKind.Bow:
+                case WeaponKind.Crossbow: ArrowCount++; break;
+                case WeaponKind.Shield: ShieldWidth += Growth; break;
                 case WeaponKind.Staff: BlastRadius += Growth; break;
                 case WeaponKind.Shuriken: Bounces++; break;
                 case WeaponKind.Sword: Damage += Growth; break;
@@ -60,24 +77,20 @@ namespace ArmOrb
                 case WeaponKind.Scythe: target.AddPoison(Growth); break;
             }
         }
-        // Returned damage goes straight to health and cannot trigger another reflection.
-        public float Block(float incomingDamage)
-        {
-            float returned = incomingDamage * Reflection;
-            Blocks++; Reflection += Growth;
-            return returned;
-        }
+        // A block alone never grows the shield. Growth is credited only after returned damage lands.
+        public float Block(float incomingDamage) { Blocks++; return Mathf.Max(0, incomingDamage); }
         public string Stat => Kind switch
         {
-            WeaponKind.Unarmed => $"СКОРОСТЬ  +{SpeedBonus:0.#}",
-            WeaponKind.Bow => $"СТРЕЛЫ  {ArrowCount}",
+            WeaponKind.Unarmed => $"СКОРОСТЬ  {CurrentSpeed:0.#}/{UnarmedMaxSpeed:0.#} · УРОН  {Damage:0}",
+            WeaponKind.Bow => $"ОЧЕРЕДЬ  {ArrowCount}",
+            WeaponKind.Crossbow => $"ЗАЛП  {ArrowCount}",
             WeaponKind.Staff => $"РАДИУС  {BlastRadius:0.##}",
             WeaponKind.Shuriken => $"ОТСКОКИ  {Bounces}",
             WeaponKind.Sword => $"УРОН  {Damage:0.#}",
             WeaponKind.Spear => $"ДЛИНА  {Reach:0.#}r",
             WeaponKind.Blade => $"ВРАЩЕНИЕ  {RotationSpeed:0}°/с",
             WeaponKind.Scythe => $"ЯД  +{Growth:0.#}/с за удар",
-            _ => $"ВОЗВРАТ  {Reflection * 100:0}%"
+            _ => $"ШИРИНА  {ShieldWidth:0.##}r"
         };
     }
 
@@ -86,6 +99,7 @@ namespace ArmOrb
         public Vector2 Position;
         public Vector2 Velocity;
         public float Angle;
+        public float AngularTravel;
         public int RotationDirection;
         public HealthState Health { get; }
         public WeaponState Weapon { get; }
