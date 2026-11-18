@@ -11,6 +11,14 @@ namespace ArmOrb
         [Tooltip("Opaque pixel rectangles, normalised to the full texture; origin at bottom left.")]
         public Rect[] rectangles = Array.Empty<Rect>();
     }
+    // Immutable geometry copied on the main thread; simulations never dereference Unity assets.
+    public sealed class WeaponShapeData
+    {
+        public readonly PixelMask artwork, shaft, head;
+        static PixelMask Copy(PixelMask mask) => new PixelMask { sprite = mask.sprite, rectangles = (Rect[])mask.rectangles.Clone() };
+        public WeaponShapeData(WeaponShapeDefinition source)
+        { artwork = Copy(source.artwork); shaft = Copy(source.shaft); head = Copy(source.head); }
+    }
     [CreateAssetMenu(menuName = "ArmOrb/Weapon shape")]
     public sealed class WeaponShapeDefinition : ScriptableObject
     {

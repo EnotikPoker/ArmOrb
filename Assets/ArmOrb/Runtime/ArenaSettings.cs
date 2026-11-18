@@ -8,6 +8,8 @@ namespace ArmOrb
         [Min(4)] public float smallSize = 6;
         [Min(4)] public float mediumSize = 8;
         [Min(4)] public float largeSize = 10;
+        [Min(4)] public float extraLargeSize = 12;
+        [Min(4)] public float hugeSize = 14;
         [Min(0.1f)] public float orbRadius = 0.55f;
         [Min(0.1f)] public float moveSpeed = 6.4f;
         [Min(0)] public float gravity = 16.7f;
@@ -15,6 +17,6 @@ namespace ArmOrb
         [Range(30, 240)] public int simulationHz = 120;
         public Color playerColor = new Color32(240, 101, 101, 255);
         public Color enemyColor = new Color32(29, 185, 190, 255);
-        public float GetSize(ArenaSize preset) => preset == ArenaSize.Small ? smallSize : preset == ArenaSize.Large ? largeSize : mediumSize;
+        public float GetSize(ArenaSize preset) => preset switch { ArenaSize.Small => smallSize, ArenaSize.Large => largeSize, ArenaSize.ExtraLarge => extraLargeSize, ArenaSize.Huge => hugeSize, _ => mediumSize };
     }
 }

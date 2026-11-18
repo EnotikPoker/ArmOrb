@@ -27,24 +27,24 @@ namespace ArmOrb.Editor
             ConfigureTextures();
             var font = AssetDatabase.LoadAssetAtPath<Font>(Root + "Art/Fonts/DejaVuSans.ttf");
             var arena = GetOrCreate<ArenaSettings>(Root + "Settings/Arena.asset");
-            arena.smallSize = 6; arena.mediumSize = 8; arena.largeSize = 10; arena.moveSpeed = 6.4f;
+            arena.smallSize = 6; arena.mediumSize = 8; arena.largeSize = 10; arena.extraLargeSize = 12; arena.hugeSize = 14; arena.moveSpeed = 6.4f;
             arena.gravity = 16.7f; arena.restitution = 1;
             arena.playerColor = new Color32(255,98,106,255); arena.enemyColor = new Color32(0,211,220,255);
             EditorUtility.SetDirty(arena);
             var definitions = new WeaponDefinition[Enum.GetValues(typeof(WeaponKind)).Length];
             string[] names = { "Меч", "Копьё", "Клинок", "Коса", "Щит", "Безоружный", "Лук", "Посох", "Сюрикен", "Арбалет" };
-            string[] descriptions = { "+1 к урону за попадание", "+0,5r к длине за попадание", "+573°/с за попадание", "+1/с яда за попадание", "Возврат 100% · растёт ширина", "Урон от скорости · +0,5 к пределу", "+1 стрела в очереди за попадание", "+0,275 к радиусу за попадание", "+1 отскок за попадание", "+1 стрела в залпе за попадание" };
+            string[] descriptions = { "+1 к урону за попадание", "+0,5r к длине за попадание", "+300°/с · максимум 1800°/с", "+1/с яда за попадание", "Возврат 100% · растёт ширина", "Урон от скорости · разгон за удар", "+1 стрела в очереди за попадание", "3 урона · +0,35 к радиусу", "+1 отскок за попадание", "+1 стрела в залпе за попадание" };
             for (int i = 0; i < definitions.Length; i++)
             {
                 string kind = ((WeaponKind)i).ToString();
                 var definition = GetOrCreate<WeaponDefinition>(Root + "Settings/" + kind + ".asset");
                 definition.kind = (WeaponKind)i; definition.displayName = names[i]; definition.description = descriptions[i];
-                definition.damage = i == 4 ? 0 : 1; definition.reach = i == 1 ? 3 : i == 2 ? 1.8f : 2.6f; definition.rotationSpeed = i switch { 0 => 372, 1 => 286, 2 => 573, 7 => 172, _ => 300 };
-                definition.growth = i switch { 1 => 0.5f, 2 => 573, 4 => 0.25f, 5 => 0.5f, 7 => 0.275f, _ => 1 };
+                definition.damage = i == 4 ? 0 : i == 1 || i == 2 ? 2 : i == 7 ? 3 : 1; definition.reach = i == 1 ? 3.5f : i == 2 ? 1.8f : 2.6f; definition.rotationSpeed = i switch { 0 => 372, 1 => 286, 2 => 573, 7 => 172, _ => 300 };
+                definition.growth = i switch { 1 => 0.5f, 2 => 300, 4 => 0.25f, 5 => 0.5f, 7 => 0.35f, _ => 1 };
                 definition.sprite = Sprite(kind);
-                definition.cooldown = i == 7 ? 1.5f : 1;
-                definition.projectileSpeed = i == 7 ? 8 : i == 8 ? 11 : 14;
-                definition.blastRadius = 1.1f; definition.waveSpeed = 6; definition.burstInterval = 0.06f; definition.unarmedMaxSpeed = 3; definition.unarmedSpeedUnit = 1.6f;
+                definition.cooldown = 1; definition.maximumRotationSpeed = 1800;
+                definition.projectileSpeed = i == 7 ? 10 : i == 8 ? 11 : 14;
+                definition.blastRadius = 1.5f; definition.waveSpeed = 6; definition.burstInterval = 0.06f; definition.unarmedMaxSpeed = 4; definition.unarmedSpeedUnit = 1.6f;
                 definition.projectileSprite = i == 6 || i == 9 ? Sprite("Arrow") : i == 7 ? Sprite("Fireball") : i == 8 ? Sprite("Shuriken") : null;
                 var shape = GetOrCreate<WeaponShapeDefinition>(Root + "Resources/WeaponShapes/" + kind + ".asset");
                 shape.artwork = ExtractMask(kind);
@@ -142,7 +142,7 @@ namespace ArmOrb.Editor
         static void ConfigurePlayer()
         {
             PlayerSettings.companyName = "EnotikPoker"; PlayerSettings.productName = "ArmOrb";
-            PlayerSettings.bundleVersion = "0.4.0"; PlayerSettings.Android.bundleVersionCode = 4;
+            PlayerSettings.bundleVersion = "0.5.0"; PlayerSettings.Android.bundleVersionCode = 5;
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.enotikpoker.armorb");
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
             PlayerSettings.allowedAutorotateToLandscapeLeft = false; PlayerSettings.allowedAutorotateToLandscapeRight = false;

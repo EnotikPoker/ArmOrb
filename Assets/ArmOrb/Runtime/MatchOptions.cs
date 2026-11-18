@@ -3,18 +3,22 @@ using UnityEngine;
 
 namespace ArmOrb
 {
-    public enum ArenaSize { Small, Medium, Large }
+    public enum ArenaSize { Small, Medium, Large, ExtraLarge, Huge }
     [Serializable]
     public sealed class MatchOptions
     {
         public ArenaSize arena = ArenaSize.Medium;
         public bool gravity = true;
+        public bool activeMotion = true;
+        public bool danger = true;
         public float playbackSpeed = 1;
         public static float ValidSpeed(float value) => value <= 0.75f ? 0.5f : value < 1.5f ? 1 : 2;
         public void Load()
         {
-            arena = (ArenaSize)Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.Arena", 1), 0, 2);
+            arena = (ArenaSize)Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.Arena", 1), 0, 4);
             gravity = PlayerPrefs.GetInt("ArmOrb.Gravity", 1) == 1;
+            activeMotion = PlayerPrefs.GetInt("ArmOrb.ActiveMotion", 1) == 1;
+            danger = PlayerPrefs.GetInt("ArmOrb.Danger", 1) == 1;
             playbackSpeed = ValidSpeed(PlayerPrefs.GetFloat("ArmOrb.Speed", 1));
         }
         public void Save()
@@ -22,6 +26,8 @@ namespace ArmOrb
             PlayerPrefs.SetInt("ArmOrb.Arena", (int)arena);
             PlayerPrefs.SetInt("ArmOrb.Gravity", gravity ? 1 : 0);
             PlayerPrefs.SetFloat("ArmOrb.Speed", playbackSpeed);
+            PlayerPrefs.SetInt("ArmOrb.ActiveMotion", activeMotion ? 1 : 0);
+            PlayerPrefs.SetInt("ArmOrb.Danger", danger ? 1 : 0);
             PlayerPrefs.Save();
         }
     }

@@ -39,7 +39,7 @@ namespace ArmOrb
             var w = freeWaves.Count > 0 ? freeWaves.Pop() : new WaveState();
             w.Id = ++nextEffectId; w.Owner = p.Owner; w.Position = p.Position;
             w.Radius = w.PreviousRadius = 0; w.MaximumRadius = p.BlastRadius;
-            w.Speed = p.WaveSpeed; w.Damage = p.Damage; w.Hit = false; w.Active = true; waves.Add(w);
+            w.Speed = p.WaveSpeed; w.Damage = p.Damage; w.Hit = false; w.HitMask = 0; w.Active = true; waves.Add(w);
             Emit(CombatEventKind.Explosion, p.Position, p.Owner);
         }
         void TickProjectiles(float dt)
@@ -52,25 +52,30 @@ namespace ArmOrb
                 // Each segment ends at the earliest body, shield or wall contact.
                 while (p.Active && remaining > 0.00000001f && contacts++ < 8)
                 {
-                    int target = 1 - p.Owner;
                     Vector2 from = p.Position, to = from + p.Velocity * remaining;
                     Vector2 direction = p.Velocity.normalized;
                     Vector2 limit = Vector2.one*(Size*0.5f-p.Radius)-new Vector2(Mathf.Abs(direction.x),Mathf.Abs(direction.y))*p.HalfShaft;
                     float tx = WallTime(from.x, to.x, limit.x), ty = WallTime(from.y, to.y, limit.y);
-                    float wall = Mathf.Min(tx, ty);
-                    Vector2 bodyFrom = Vector2.Lerp(start[target], end[target], offset / dt);
-                    float body = ProjectileCollision.Body(bodyFrom - from, end[target] - to, direction, p.HalfShaft, Radius + p.Radius);
-                    float shield = Orbs[target].Weapon.Kind == WeaponKind.Shield ?
-                        ProjectileCollision.Shield(from-direction*p.HalfShaft, to+direction*p.HalfShaft, p.Radius, target == 0 ? first : second) : float.PositiveInfinity;
-                    if (shield <= 1 && p.HalfShaft > 0)
-                        shield = Mathf.Clamp01((shield*((to-from).magnitude+2*p.HalfShaft)-2*p.HalfShaft)/(to-from).magnitude);
+                    float wall = Mathf.Min(tx, ty), body = float.PositiveInfinity, shield = float.PositiveInfinity;
+                    int bodyTarget=-1,shieldTarget=-1;
+                    for(int target=0;target<Orbs.Length;target++) if(target!=p.Owner && alive[target])
+                    {
+                        Vector2 bodyFrom = Vector2.Lerp(start[target], end[target], offset / dt);
+                        float candidate = ProjectileCollision.Body(bodyFrom-from,end[target]-to,direction,p.HalfShaft,Radius+p.Radius);
+                        if(candidate<body){body=candidate;bodyTarget=target;}
+                        if(Orbs[target].Weapon.Kind!=WeaponKind.Shield)continue;
+                        candidate=ProjectileCollision.Shield(from-direction*p.HalfShaft,to+direction*p.HalfShaft,p.Radius,geometry[target]);
+                        if(candidate<=1 && p.HalfShaft>0)
+                            candidate=Mathf.Clamp01((candidate*((to-from).magnitude+2*p.HalfShaft)-2*p.HalfShaft)/Mathf.Max(0.0000001f,(to-from).magnitude));
+                        if(candidate<shield){shield=candidate;shieldTarget=target;}
+                    }
                     float impact = Mathf.Min(wall, Mathf.Min(body, shield));
                     if (impact > 1) { p.Position = to; break; }
                     p.Position = Vector2.Lerp(from, to, impact);
                     if (shield <= body && shield <= wall)
                     {
                         // Transfer the projectile, retaining its kind, damage, blast radius and bounce budget.
-                        var defender = Orbs[target]; defender.Weapon.Block(0);
+                        int target=shieldTarget; var defender = Orbs[target]; defender.Weapon.Block(0);
                         float radians = defender.Angle * Mathf.Deg2Rad;
                         Vector2 normal = new Vector2(Mathf.Cos(radians), Mathf.Sin(radians));
                         Vector2 away = OrbMotion.Direction(p.Position-defender.Position,normal);
@@ -78,14 +83,14 @@ namespace ArmOrb
                         if(Vector2.Dot(outgoing,away)<0) outgoing=Vector2.Reflect(p.Velocity,away);
                         p.Velocity=outgoing; p.Owner=target; p.Reflections++;
                         p.Position+=OrbMotion.Direction(outgoing,away)*0.0001f;
-                        Emit(CombatEventKind.Block,p.Position,target);
+                        Emit(CombatEventKind.Block,p.Position,target);MarkContact(target,p.Owner);
                         offset+=remaining*impact; remaining*=1-impact;
                         continue;
                     }
                     else if (body <= wall)
                     {
                         if (p.Kind == WeaponKind.Staff) Explode(p);
-                        else DamageHit(p.Owner, p.Damage, p.Position);
+                        else DamageHit(p.Owner, bodyTarget, p.Damage, p.Position);
                         p.Active = false;
                     }
                     else if (p.Kind == WeaponKind.Shuriken && p.Bounces > 0)
@@ -108,18 +113,17 @@ namespace ArmOrb
             {
                 var w = waves[n]; float beforeRadius = w.Radius;
                 w.Radius = Mathf.Min(w.MaximumRadius, w.Radius + w.Speed * dt);
-                int target = 1 - w.Owner;
-                if (!w.Hit && ProjectileCollision.Ring(start[target] - w.Position, end[target] - w.Position,
-                    beforeRadius, w.Radius, Radius))
-                { w.Hit = true; DamageHit(w.Owner, w.Damage, Orbs[target].Position); }
+                for(int target=0;target<Orbs.Length;target++) if(target!=w.Owner && alive[target] && (w.HitMask&(1<<target))==0 &&
+                    ProjectileCollision.Ring(start[target]-w.Position,end[target]-w.Position,beforeRadius,w.Radius,Radius))
+                { w.Hit=true;w.HitMask|=1<<target;DamageHit(w.Owner,target,w.Damage,Orbs[target].Position); }
                 if (w.Radius >= w.MaximumRadius) w.Active = false;
             }
             for (int n = waves.Count - 1; n >= 0; n--)
                 if (!waves[n].Active) { freeWaves.Push(waves[n]); waves.RemoveAt(n); }
-            for (int side = 0; side < 2; side++)
+            for (int side = 0; side < Orbs.Length; side++)
             {
                 var weapon = Orbs[side].Weapon;
-                if (!weapon.IsRanged) continue;
+                if (!alive[side] || Orbs[side].Health.IsDead || !weapon.IsRanged) continue;
                 if(weapon.IsBursting)
                 {
                     weapon.BurstDelay-=dt;
@@ -151,18 +155,22 @@ namespace ArmOrb
             if (d < 0 && to <= -limit) return Mathf.Clamp01((-limit - from) / d);
             return float.PositiveInfinity;
         }
-        void DamageHit(int attacker, float damage, Vector2 position)
+        void DamageHit(int attacker, int targetId, float damage, Vector2 position)
         {
-            var orb = Orbs[attacker]; var target = Orbs[1 - attacker];
-            float beforeHealth=target.Health.Current;
+            var orb=Orbs[attacker];var target=Orbs[targetId];float before=target.Health.Current;
             target.Health.Damage(damage);
-            if(target.Health.Current<beforeHealth)
+            if(target.Health.Current<before)
             {
-                orb.Weapon.OnHit(target.Health);
-                if(orb.Weapon.Kind==WeaponKind.Unarmed && !UsesGravity && Speed>0)
-                    orb.Velocity=OrbMotion.Direction(orb.Velocity,Vector2.right)*orb.Weapon.UnarmedWorldLimit;
+                orb.Weapon.OnHit(target.Health);lastDamage=Elapsed;MarkContact(attacker,targetId);
+                if(orb.Weapon.Kind==WeaponKind.Unarmed && Speed>0)
+                {
+                    float current=orb.Velocity.magnitude;
+                    float wanted=Mathf.Min(current+orb.Weapon.Growth*orb.Weapon.SpeedUnit,orb.Weapon.UnarmedWorldLimit);
+                    if(wanted>current)
+                        orb.Velocity=OrbMotion.Direction(orb.Velocity,OrbMotion.Direction(incoming[attacker],orb.Position-target.Position))*wanted;
+                }
             }
-            Emit(CombatEventKind.Hit, position, 1 - attacker, damage);
+            Emit(CombatEventKind.Hit,position,targetId,Mathf.Min(before,damage),attacker);
         }
     }
 }

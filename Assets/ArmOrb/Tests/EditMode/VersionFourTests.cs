@@ -48,7 +48,7 @@ namespace ArmOrb.Tests
         [Test] public void WallBounceDoesNotReverseWeaponRotation()
         {
             var sim=new ArenaSimulation(W(WeaponKind.Sword,372),W(WeaponKind.Bow),size:8,gravity:true);
-            sim.Orbs[0].Position=new Vector2(3.44f,1);sim.Orbs[0].Velocity=new Vector2(6,0);sim.Orbs[0].Angle=90;
+            sim.Orbs[0].Position=new Vector2(3.44f,1);sim.Orbs[0].Velocity=new Vector2(6,0);sim.Orbs[0].Angle=90;sim.Orbs[0].RotationDirection=1;
             sim.Orbs[1].Position=new Vector2(-2,-2);sim.Step(1f/120);
             Assert.That(sim.Orbs[0].Velocity.x,Is.LessThan(0));Assert.That(sim.Orbs[0].RotationDirection,Is.EqualTo(1));
             Assert.That(sim.Orbs[0].Angle,Is.EqualTo(93.1f).Within(0.001));
@@ -72,7 +72,7 @@ namespace ArmOrb.Tests
         {
             var sim=new ArenaSimulation(W(WeaponKind.Blade,30000),W(WeaponKind.Bow),size:8,speed:0);
             sim.Orbs[0].Position=new Vector2(-3,0);sim.Orbs[1].Position=new Vector2(3,0);
-            sim.Orbs[0].Angle=20;sim.Step(1f/120);
+            sim.Orbs[0].Angle=20;sim.Orbs[0].RotationDirection=1;sim.Step(1f/120);
             Assert.That(sim.Orbs[0].AngularTravel,Is.EqualTo(250).Within(0.01));Assert.That(sim.Orbs[0].Angle,Is.EqualTo(270).Within(0.01));
         }
         [Test] public void BowReleasesSequentialParallelArrowsAndReloadsAfterBurst()
@@ -147,7 +147,7 @@ namespace ArmOrb.Tests
             Run(sim,2);Assert.That(sim.Orbs[0].Health.Current,Is.EqualTo(100));Assert.That(sim.Orbs[1].Health.Current,Is.EqualTo(100));
             Assert.That(sim.Result,Is.EqualTo(MatchResult.InProgress));
         }
-        [Test] public void UnarmedMaximumGrowsButDoesNotArtificiallyAccelerateGravityFlight()
+        [Test] public void UnarmedGrowthDoesNotClipFreeFallVelocity()
         {
             var weapon=new WeaponState(WeaponKind.Unarmed,growth:0.5f);
             var sim=new ArenaSimulation(weapon,W(WeaponKind.Bow),speed:0,gravity:true,gravityAcceleration:0);
@@ -155,9 +155,9 @@ namespace ArmOrb.Tests
             sim.Orbs[0].Velocity=new Vector2(3.2f,0);sim.Orbs[1].Velocity=Vector2.zero;
             sim.Step(1f/120);Assert.That(weapon.Damage,Is.EqualTo(2));
             weapon.OnHit(sim.Orbs[1].Health);sim.Step(1f/120);
-            Assert.That(weapon.UnarmedMaxSpeed,Is.EqualTo(3.5f));Assert.That(sim.Orbs[0].Velocity.magnitude,Is.EqualTo(3.2f));
+            Assert.That(weapon.UnarmedMaxSpeed,Is.EqualTo(4.5f));Assert.That(sim.Orbs[0].Velocity.magnitude,Is.EqualTo(3.2f));
             sim.Orbs[0].Velocity=new Vector2(12,0);sim.Step(1f/120);
-            Assert.That(sim.Orbs[0].Velocity.magnitude,Is.EqualTo(5.6f).Within(0.001));Assert.That(weapon.Damage,Is.EqualTo(3));
+            Assert.That(sim.Orbs[0].Velocity.magnitude,Is.EqualTo(12).Within(0.001));Assert.That(weapon.Damage,Is.EqualTo(7));
         }
         [Test] public void UnarmedDealsPreImpactSpeedDamageEvenWhenBodyExchangeStopsIt()
         {
@@ -165,7 +165,7 @@ namespace ArmOrb.Tests
             var sim=new ArenaSimulation(weapon,W(WeaponKind.Bow),speed:0,gravity:true,gravityAcceleration:0);
             sim.Orbs[0].Position=new Vector2(-0.5f,0);sim.Orbs[1].Position=new Vector2(0.5f,0);
             sim.Orbs[0].Velocity=new Vector2(4.8f,0);sim.Orbs[1].Velocity=Vector2.zero;sim.Step(1f/120);
-            Assert.That(sim.Orbs[1].Health.Current,Is.EqualTo(97));Assert.That(weapon.UnarmedMaxSpeed,Is.EqualTo(3.5f));
+            Assert.That(sim.Orbs[1].Health.Current,Is.EqualTo(97));Assert.That(weapon.UnarmedMaxSpeed,Is.EqualTo(4.5f));
             Assert.That(sim.Orbs[0].Velocity.magnitude,Is.EqualTo(0).Within(0.001));Assert.That(weapon.Damage,Is.EqualTo(1));
         }
         [Test] public void ProjectileCanBeReflectedByBothShieldsWithoutRecursiveDamage()
