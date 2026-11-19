@@ -17,6 +17,7 @@ namespace ArmOrb
         public Vector2 Position;
         public float Radius, PreviousRadius, MaximumRadius, Speed, Damage;
         public bool Hit, Active;
+        public int HitMask;
     }
 
     public static class ProjectileCollision

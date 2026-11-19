@@ -48,9 +48,9 @@ namespace ArmOrb.Tests
             sim.Orbs[0].Position=new Vector2(-0.5f,0);sim.Orbs[1].Position=new Vector2(0.5f,0);
             sim.Orbs[0].Velocity=Vector2.right*sim.Speed;sim.Orbs[1].Velocity=Vector2.left*sim.Speed;
             sim.Step(1f/120);
-            Assert.That(sim.Orbs[0].Weapon.UnarmedMaxSpeed,Is.EqualTo(3.5f));
-            Assert.That(sim.Orbs[1].Health.Current,Is.EqualTo(97));
-            Assert.That(sim.Orbs[0].Velocity.magnitude,Is.EqualTo(5.6f).Within(0.001f));
+            Assert.That(sim.Orbs[0].Weapon.UnarmedMaxSpeed,Is.EqualTo(4.5f));
+            Assert.That(sim.Orbs[1].Health.Current,Is.EqualTo(96));
+            Assert.That(sim.Orbs[0].Velocity.magnitude,Is.EqualTo(7.2f).Within(0.001f));
             Assert.That(sim.Orbs[1].Velocity.magnitude,Is.EqualTo(6.4f).Within(0.001f));
         }
         [Test] public void CrossbowUsesCooldownAndSnapshotsSimultaneousFan()

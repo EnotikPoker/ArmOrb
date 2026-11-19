@@ -43,6 +43,7 @@ namespace ArmOrb
             }
             item.Seen = frame; item.Root.SetActive(true); active.Add(id, item); return item;
         }
+        static Color OwnerColor(int owner) => owner switch { 0 => new Color32(255,98,106,255), 1 => new Color32(0,195,204,255), 2 => new Color32(145,109,235,255), 3 => new Color32(241,171,41,255), _ => new Color32(82,184,100,255) };
         public void Draw(ArenaSimulation simulation, float alpha)
         {
             frame++;
@@ -50,7 +51,7 @@ namespace ArmOrb
             {
                 var item = Get(p.Id, false);
                 item.Sprite.sprite = weapons[(int)p.Kind].projectileSprite;
-                item.Sprite.color=p.Reflections>0?(p.Owner==0?new Color32(255,98,106,255):new Color32(0,211,220,255)):Color.white;
+                item.Sprite.color=p.Reflections>0?OwnerColor(p.Owner):Color.white;
                 item.Root.transform.position = Vector2.Lerp(p.PreviousPosition, p.Position, alpha);
                 float angle = Mathf.Atan2(p.Velocity.y, p.Velocity.x) * Mathf.Rad2Deg;
                 item.Root.transform.rotation = Quaternion.Euler(0, 0, p.Kind == WeaponKind.Shuriken ? p.Age * 900 : angle);
@@ -61,6 +62,7 @@ namespace ArmOrb
             foreach (var w in simulation.Waves)
             {
                 var item = Get(w.Id, true); item.Root.transform.position = w.Position;
+                item.Ring.startColor=item.Ring.endColor=OwnerColor(w.Owner);
                 float radius = Mathf.Lerp(w.PreviousRadius, w.Radius, alpha);
                 for (int i = 0; i < circle.Length; i++)
                 {

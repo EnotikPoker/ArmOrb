@@ -9,6 +9,7 @@ namespace ArmOrb
         public TextMesh healthLabel;
         public WeaponView Weapon { get; private set; }
         Color color;
+        int participant=-1;
         float flash;
         readonly SpriteRenderer[] trail=new SpriteRenderer[10];
         readonly Vector2[] trailPositions=new Vector2[10];
@@ -34,9 +35,9 @@ namespace ArmOrb
                 Color c=color;c.a=0.24f*Mathf.Clamp01(1-trailAges[i]/0.22f);trail[i].color=c;trail[i].enabled=c.a>0;
             }
         }
-        public void Configure(Color tint, float radius, WeaponView weaponPrefab)
+        public void Configure(Color tint, float radius, WeaponView weaponPrefab, int participantIndex=-1)
         {
-            color = tint;
+            color = tint; participant=participantIndex;
             body.transform.localScale = Vector3.one * (radius * 2 / body.sprite.bounds.size.x);
             shadow.transform.localScale = body.transform.localScale;
             Weapon = Instantiate(weaponPrefab, transform.parent);
@@ -44,12 +45,15 @@ namespace ArmOrb
         public void Hit() => flash = 0.12f;
         public void Draw(CombatantState state, float radius, float dt, Vector2 position, float angle)
         {
+            bool dead=state.Health.IsDead;
+            body.enabled=!dead;healthLabel.gameObject.SetActive(!dead);Weapon.gameObject.SetActive(!dead);
+            if(dead){foreach(var ghost in trail)if(ghost)ghost.enabled=false;return;}
             DrawTrail(state,dt,position);
             transform.position = position;
             flash = Mathf.Max(0, flash - dt);
             body.color = Color.Lerp(color, Color.white, flash / 0.12f);
-            healthLabel.text = Mathf.CeilToInt(state.Health.Current).ToString();
-            healthLabel.characterSize = 0.09f * Mathf.Min(1, 2.4f / healthLabel.text.Length);
+            healthLabel.text = (participant>=0?"#"+(participant+1)+"\n":"")+Mathf.CeilToInt(state.Health.Current);
+            healthLabel.characterSize = (participant>=0?0.065f:0.09f) * Mathf.Min(1, 3f / Mathf.CeilToInt(state.Health.Current).ToString().Length);
             Weapon.Draw(state, radius, position, angle);
         }
         public void Remove()

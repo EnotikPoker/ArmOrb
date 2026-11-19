@@ -26,13 +26,16 @@ namespace ArmOrb
         [Min(0.01f)] public float blastRadius = 1.1f;
         [Min(0.1f)] public float waveSpeed = 6;
         [Min(0.01f)] public float burstInterval = 0.06f;
-        [Min(0.1f)] public float unarmedMaxSpeed = 3;
+        [Min(0.1f)] public float unarmedMaxSpeed = 4;
         [Tooltip("World units per point of Speed/Damage, calibrated to the reference arena.")]
         [Min(0.1f)] public float unarmedSpeedUnit = 1.6f;
         public Sprite projectileSprite;
+        [Min(1)] public float maximumRotationSpeed = 1800;
 
         public WeaponState CreateState() => new WeaponState(kind, damage, reach, rotationSpeed, growth, 1, shape,
-            cooldown, projectileSpeed, blastRadius, waveSpeed, burstInterval, unarmedMaxSpeed, unarmedSpeedUnit);
+            cooldown, projectileSpeed, blastRadius, waveSpeed, burstInterval, unarmedMaxSpeed, unarmedSpeedUnit, maximumRotationSpeed);
+
+        public WeaponTemplate Snapshot() => new WeaponTemplate(this);
     }
 
 }

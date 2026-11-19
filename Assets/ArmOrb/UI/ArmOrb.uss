@@ -73,3 +73,49 @@ Button:focus { border-color: #111111; }
 .dialog-title { font-size: 32px; -unity-font-style: bold; margin-bottom: 16px; }
 .dialog-description { font-size: 21px; margin-bottom: 15px; }
 .rule { font-size: 19px; margin-bottom: 18px; }
+/* v0.5 */
+.balance { font-size: 20px; -unity-font-style: bold; }
+.mode-tabs { margin-top: 10px; margin-bottom: 8px; flex-shrink: 0; }
+.mode-tab { width: 49%; height: 54px; font-size: 22px; }
+.mode-tab.selected { color: white; background-color: #111111; }
+.home-content { padding: 10px 0 18px; }
+.section-name { font-size: 26px; margin-top: 18px; margin-bottom: 12px; -unity-font-style: bold; }
+.conditions { border-width: 1px; border-color: #d5d5d0; padding: 15px; background-color: white; margin-bottom: 12px; }
+.condition-title { font-size: 22px; margin-bottom: 7px; -unity-font-style: bold; }
+.calculation { font-size: 21px; margin: 12px 0 6px; }
+.error { color: #be343c; font-size: 19px; margin-bottom: 12px; }
+.bet-choice { min-height: 76px; border-color: #d5d5d0; border-left-width: 6px; padding: 10px; margin-top: 8px; }
+.bet-choice.selected { border-top-color: #111111; border-bottom-color: #111111; border-right-color: #111111; background-color: #eaeae4; }
+.offer-icon { width: 46px; height: 42px; margin-right: 10px; flex-shrink: 0; }
+.offer-name { flex-grow: 1; font-size: 21px; }
+.offer-health { width: 90px; font-size: 18px; -unity-text-align: middle-right; }
+.offer-odds { width: 105px; font-size: 23px; -unity-font-style: bold; -unity-text-align: middle-right; }
+.stake-input { margin-top: 22px; min-height: 50px; font-size: 22px; }
+.stake-input > .unity-base-field__label { min-width: 110px; }
+.stake-input > .unity-base-field__input { background-color: white; border-width: 1px; border-color: #999999; font-size: 24px; padding: 8px; }
+.payout { font-size: 19px; margin: 10px 0; }
+.stake-button { width: 23%; }
+.offer-actions > Button { width: 49%; font-size: 20px; }
+.count-control { margin-bottom: 12px; }
+.count-control .setting-label { flex-grow: 1; margin-top: 0; margin-bottom: 0; }
+.count-button { min-width: 55px; margin-left: 12px; margin-right: 12px; }
+.test-card { background-color: white; border-width: 1px; border-color: #d5d5d0; border-left-width: 5px; padding: 12px; margin-bottom: 10px; }
+.participant-number { width: 50px; font-size: 23px; -unity-font-style: bold; }
+.weapon-dropdown { flex-grow: 1; font-size: 22px; min-height: 48px; margin-right: 16px; }
+.weapon-dropdown .unity-base-field__input { background-color: #f4f4f0; padding: 8px; }
+.compact-hp { width: 170px; min-height: 48px; font-size: 21px; }
+.compact-hp > .unity-base-field__label { min-width: 35px; width: 35px; }
+.compact-hp > .unity-base-field__input { background-color: #f4f4f0; padding: 8px; }
+.test-card > .small { margin-top: 6px; }
+.wide-field { min-height: 48px; font-size: 21px; margin-bottom: 10px; }
+.wide-field .unity-base-field__input { padding: 10px; background-color: #f4f4f0; }
+.option-toggle { min-height: 42px; font-size: 20px; margin-top: 10px; }
+.option-toggle .unity-toggle__checkmark { width: 26px; height: 26px; margin-right: 12px; }
+.fight-participants { flex-direction: row; flex-wrap: wrap; justify-content: space-between; flex-shrink: 0; margin-top: 8px; }
+.fight-participant { width: 49%; padding: 6px 8px; border-left-width: 4px; margin-bottom: 5px; background-color: white; }
+.fighter-label { font-size: 18px; }
+.fight-hp { font-size: 19px; -unity-font-style: bold; }
+.fight-participant .reload-track { margin-top: 4px; height: 3px; }
+.danger-label { min-height: 25px; font-size: 16px; color: #b55226; margin: 4px 0; }
+.fight-stats { flex-shrink: 0; margin: 8px 0 12px; }
+.fighter-stat { font-size: 15px; min-height: 23px; }

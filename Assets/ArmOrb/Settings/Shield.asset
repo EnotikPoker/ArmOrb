@@ -25,9 +25,10 @@ MonoBehaviour:
   shape: {fileID: 11400000, guid: 92f61cdd0243c4a8e95ef1531c776514, type: 2}
   cooldown: 1
   projectileSpeed: 14
-  blastRadius: 1.1
+  blastRadius: 1.5
   waveSpeed: 6
   burstInterval: 0.06
-  unarmedMaxSpeed: 3
+  unarmedMaxSpeed: 4
   unarmedSpeedUnit: 1.6
   projectileSprite: {fileID: 0}
+  maximumRotationSpeed: 1800

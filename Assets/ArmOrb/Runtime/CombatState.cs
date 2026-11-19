@@ -29,7 +29,8 @@ namespace ArmOrb
         public float Reflection => 1;
         public float ShieldWidth { get; private set; } = 2.1f;
         public float Growth { get; }
-        public WeaponShapeDefinition Shape { get; }
+        public WeaponShapeData Shape { get; }
+        public float MaximumRotationSpeed { get; }
         public bool IsRanged => Kind == WeaponKind.Bow || Kind == WeaponKind.Staff || Kind == WeaponKind.Shuriken || Kind == WeaponKind.Crossbow;
         public bool IsMelee => !IsRanged && Kind != WeaponKind.Unarmed;
         public float SpeedBonus { get; private set; }
@@ -49,11 +50,12 @@ namespace ArmOrb
         public int Blocks { get; private set; }
         public WeaponState(WeaponKind kind, float damage = 1, float reach = 2.6f,
             float rotationSpeed = 300, float growth = 1, float reflection = 1, WeaponShapeDefinition shape = null,
-            float cooldown = 1, float projectileSpeed = 14, float blastRadius = 1.1f, float waveSpeed = 6, float burstInterval = 0.06f, float unarmedMaxSpeed = 3, float unarmedSpeedUnit = 1.6f)
+            float cooldown = 1, float projectileSpeed = 14, float blastRadius = 1.1f, float waveSpeed = 6, float burstInterval = 0.06f, float unarmedMaxSpeed = 4, float unarmedSpeedUnit = 1.6f, float maximumRotationSpeed = 1800, WeaponShapeData geometry = null)
         {
             Kind = kind; Damage = kind == WeaponKind.Shield ? 0 : damage; Reach = reach;
             RotationSpeed = rotationSpeed; Growth = growth;
-            Shape = shape ? shape : WeaponShapeDefinition.Get(kind);
+            Shape = geometry ?? new WeaponShapeData(shape ? shape : WeaponShapeDefinition.Get(kind));
+            MaximumRotationSpeed = Mathf.Max(rotationSpeed, maximumRotationSpeed);
             Cooldown = Mathf.Max(0.05f, cooldown); ProjectileSpeed = Mathf.Max(0.1f, projectileSpeed);
             BlastRadius = Mathf.Max(0.01f, blastRadius); WaveSpeed = Mathf.Max(0.1f, waveSpeed);
             initialUnarmedMaxSpeed=Mathf.Max(0.1f,unarmedMaxSpeed); SpeedUnit=Mathf.Max(0.1f,unarmedSpeedUnit);
@@ -65,7 +67,7 @@ namespace ArmOrb
             Hits++;
             switch (Kind)
             {
-                case WeaponKind.Unarmed: SpeedBonus += Growth; break;
+                case WeaponKind.Unarmed: SpeedBonus = Mathf.Min(12-initialUnarmedMaxSpeed, SpeedBonus + Growth); break;
                 case WeaponKind.Bow:
                 case WeaponKind.Crossbow: ArrowCount++; break;
                 case WeaponKind.Shield: ShieldWidth += Growth; break;
@@ -73,7 +75,7 @@ namespace ArmOrb
                 case WeaponKind.Shuriken: Bounces++; break;
                 case WeaponKind.Sword: Damage += Growth; break;
                 case WeaponKind.Spear: Reach += Growth; break;
-                case WeaponKind.Blade: RotationSpeed += Growth; break;
+                case WeaponKind.Blade: RotationSpeed = Mathf.Min(MaximumRotationSpeed, RotationSpeed + Growth); break;
                 case WeaponKind.Scythe: target.AddPoison(Growth); break;
             }
         }
@@ -81,7 +83,7 @@ namespace ArmOrb
         public float Block(float incomingDamage) { Blocks++; return Mathf.Max(0, incomingDamage); }
         public string Stat => Kind switch
         {
-            WeaponKind.Unarmed => $"СКОРОСТЬ  {CurrentSpeed:0.#}/{UnarmedMaxSpeed:0.#} · УРОН  {Damage:0}",
+            WeaponKind.Unarmed => $"СКОРОСТЬ {CurrentSpeed:0.#} · РАЗГОН {UnarmedMaxSpeed:0.#} · УРОН {Damage:0}",
             WeaponKind.Bow => $"ОЧЕРЕДЬ  {ArrowCount}",
             WeaponKind.Crossbow => $"ЗАЛП  {ArrowCount}",
             WeaponKind.Staff => $"РАДИУС  {BlastRadius:0.##}",
@@ -106,15 +108,17 @@ namespace ArmOrb
         public CombatantState(float health, WeaponState weapon) { Health = new HealthState(health); Weapon = weapon; }
     }
 
-    public enum MatchResult { InProgress, Player, Enemy, Draw }
+    public enum MatchResult { InProgress, Player, Enemy, Draw, Other }
     public enum CombatEventKind { Wall, Body, Hit, Clash, Block, Poison, Shot, Explosion, Finished }
     public readonly struct CombatEvent
     {
         public readonly CombatEventKind Kind;
         public readonly Vector2 Position;
         public readonly int Side;
+        public readonly int ActorId;
+        public int TargetId => Side;
         public readonly float Amount;
-        public CombatEvent(CombatEventKind kind, Vector2 position, int side = 0, float amount = 0)
-        { Kind = kind; Position = position; Side = side; Amount = amount; }
+        public CombatEvent(CombatEventKind kind, Vector2 position, int side = 0, float amount = 0, int actorId = -1)
+        { Kind = kind; Position = position; Side = side; Amount = amount; ActorId = actorId; }
     }
 }
