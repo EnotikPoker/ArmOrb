@@ -2,9 +2,11 @@
 
 Автоматические бои 2–5 вооружённых шаров для Android. В режиме **«Ставки»** можно выбрать победителя случайного боя и поставить игровые монеты. **«Тест»** позволяет вручную настроить участников и условия.
 
-**Unity 6000.4.0f1 · Android 8.0+ · ARM64 · портретная ориентация · v0.5.0**
+**Unity 6000.4.0f1 · Android 8.0+ · ARM64 · портретная ориентация · v0.5.1**
 
-**[Скачать APK v0.5.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.5.0.apk)** · [Проверки](docs/VALIDATION.md) · [Изменения](CHANGELOG.md) · [Физика и баланс](docs/ACTIVE_COMBAT.md)
+**[Скачать APK v0.5.1](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.5.1.apk)** · [Проверки](docs/VALIDATION.md) · [Изменения](CHANGELOG.md) · [Физика и баланс](docs/ACTIVE_COMBAT.md)
+
+<img src="docs/images/v05-offer.png" width="300" alt="Условия и коэффициенты"> <img src="docs/images/v05-battle.png" width="300" alt="Бой пяти участников">
 
 ## Открыть в Unity
 
@@ -88,7 +90,7 @@ export UNITY_EDITOR="$HOME/Unity/Hub/Editor/6000.4.0f1/Editor/Unity"
 bash Tools/unity.sh android
 ```
 
-Результат — `Builds/Android/ArmOrb-v0.5.0.apk`, пакет `com.enotikpoker.armorb`, versionCode 5. IL2CPP ARM64, Development Build с прежней отладочной подписью. APK обновляет предыдущую версию без удаления данных. APK и SHA-256 публикуются в отдельной ветке [`android-builds`](https://github.com/EnotikPoker/ArmOrb/tree/android-builds).
+Результат — `Builds/Android/ArmOrb-v0.5.1.apk`, пакет `com.enotikpoker.armorb`, versionCode 6. IL2CPP ARM64, Development Build с прежней отладочной подписью. APK обновляет предыдущую версию без удаления данных. APK и SHA-256 публикуются в отдельной ветке [`android-builds`](https://github.com/EnotikPoker/ArmOrb/tree/android-builds).
 
 Данные монет и ставки: `Application.persistentDataPath/v05/wallet.json`, атомарная замена и резервная копия. Ставка и списание сохраняются вместе; расчёт выплаты защищён ID. Состояние боя сохраняется раз в две секунды, при паузе и сворачивании. После аварийного завершения возможен откат нескольких последних секунд того же боя. При несовместимости будущих правил ставка возвращается.
 

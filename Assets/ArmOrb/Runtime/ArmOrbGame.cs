@@ -202,7 +202,12 @@ namespace ArmOrb
             }
             float alpha=IsPaused||Simulation.Result!=MatchResult.InProgress?1:clock.Interpolation;
             float dt=IsPaused||Simulation.Result!=MatchResult.InProgress?0:Time.unscaledDeltaTime*Options.playbackSpeed;
-            for(int i=0;i<views.Length;i++)views[i].Draw(Simulation.Orbs[i],settings.orbRadius,dt,Vector2.Lerp(previousPositions[i],Simulation.Orbs[i].Position,alpha),previousAngles[i]+Simulation.Orbs[i].AngularTravel*alpha);
+            for(int i=0;i<views.Length;i++)
+            {
+                var state=Simulation.Orbs[i];
+                float angle=IsPaused||Simulation.Result!=MatchResult.InProgress?state.Angle:previousAngles[i]+state.AngularTravel*alpha;
+                views[i].Draw(state,settings.orbRadius,dt,Vector2.Lerp(previousPositions[i],state.Position,alpha),angle);
+            }
             projectileView.Draw(Simulation,alpha);arenaView.DrawDanger(Simulation);feedback.Draw(dt);ui.RefreshFight();
         }
         void OnCombatEvent(CombatEvent e)
