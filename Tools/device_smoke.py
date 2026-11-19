@@ -11,7 +11,7 @@ parser.add_argument('--adb', default='adb')
 parser.add_argument('--serial', required=True, help='Device serial from adb devices')
 parser.add_argument('--apk', type=Path)
 parser.add_argument('--seconds', type=float, default=8)
-parser.add_argument('--all-pairs', action='store_true', help='Opt in to 15 launches, restarting the app for each matchup')
+parser.add_argument('--all-pairs', action='store_true', help='Opt in to 55 launches, restarting the app for each matchup')
 parser.add_argument('--output', type=Path, default=Path('TestResults/device'))
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
@@ -23,10 +23,10 @@ def adb(*command, binary=False):
 if args.apk:
     print(adb('install', '-r', args.apk), flush=True)
 
-pairs = [(a,b) for a in range(5) for b in range(a,5)] if args.all_pairs else [(0,1)]
-names = ['Sword','Spear','Blade','Scythe','Shield']
+pairs = [(a,b) for a in range(10) for b in range(a,10)] if args.all_pairs else [(0,1)]
+names = ['Sword','Spear','Blade','Scythe','Shield','Unarmed','Bow','Staff','Shuriken','Crossbow']
 failures = []
-component = adb('shell','cmd','package','resolve-activity','--brief',PACKAGE).splitlines()[-1]
+component = adb('shell','cmd','package','resolve-activity','--brief','-p',PACKAGE).splitlines()[-1]
 if '/' not in component: raise SystemExit('Cannot resolve installed ArmOrb activity: '+component)
 for a,b in pairs:
     name = f'{names[a]}-{names[b]}'

@@ -44,7 +44,7 @@ namespace ArmOrb
             return time;
         }
         public static bool Resolve(CombatantState a, CombatantState b, float radius, float speed,
-            bool preserveEnergy = false, float restitution = 1)
+            bool preserveEnergy = false, float restitution = 1, float secondSpeed = -1)
         {
             Vector2 delta = b.Position - a.Position;
             if (delta.sqrMagnitude >= 4 * radius * radius) return false;
@@ -60,7 +60,7 @@ namespace ArmOrb
                 if (!preserveEnergy)
                 {
                     a.Velocity = Direction(a.Velocity, -normal) * speed;
-                    b.Velocity = Direction(b.Velocity, normal) * speed;
+                    b.Velocity = Direction(b.Velocity, normal) * (secondSpeed < 0 ? speed : secondSpeed);
                 }
             }
             return true;

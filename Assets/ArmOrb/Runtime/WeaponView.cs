@@ -12,6 +12,7 @@ namespace ArmOrb
         {
             transform.position=position; transform.rotation=Quaternion.Euler(0,0,angle); transform.localScale=Vector3.one;
             int count=WeaponGeometry.GetParts(orb.Weapon,parts);
+            artwork.enabled = count > 0;
             for(int i=0;i<count;i++)
             {
                 var renderer=i==0?artwork:spearHead; var part=parts[i];

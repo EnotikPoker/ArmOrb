@@ -27,6 +27,7 @@ namespace ArmOrb
         public RenderTexture ArenaTexture { get; private set; }
         readonly OrbView[] views = new OrbView[2];
         GameInterface ui;
+        ProjectileView projectileView;
         SimulationClock clock;
         readonly Vector2[] previousPositions = new Vector2[2];
         readonly float[] previousAngles = new float[2];
@@ -39,6 +40,7 @@ namespace ArmOrb
             Options.Load();
             ArenaTexture = new RenderTexture(1024, 1024, 16, RenderTextureFormat.ARGB32) { name = "ArmOrb Arena" };
             ArenaTexture.Create(); arenaCamera.targetTexture = ArenaTexture;
+            projectileView = new ProjectileView(transform, weapons, arenaView.boundary.sharedMaterial);
             ui = new GameInterface(this); ui.ShowSetup();
             TryAndroidQa();
         }
@@ -49,7 +51,7 @@ namespace ArmOrb
             if (!replaySeed || LastSeed == 0) LastSeed = Environment.TickCount & int.MaxValue;
             Simulation = new ArenaSimulation(weapons[Selection[0]].CreateState(), weapons[Selection[1]].CreateState(),
                 Health[0], Health[1], LastSeed, settings.GetSize(Options.arena), settings.orbRadius, settings.moveSpeed,
-                Options.gravity, settings.gravity, settings.restitution, settings.minimumFloorBounce);
+                Options.gravity, settings.gravity, settings.restitution);
             Simulation.Event += OnCombatEvent;
             for (int i = 0; i < 2; i++)
             {
@@ -95,10 +97,11 @@ namespace ArmOrb
             }
             float alpha = IsPaused || Simulation.Result != MatchResult.InProgress ? 1 : clock.Interpolation;
             for (int i = 0; i < 2; i++)
-                views[i].Draw(Simulation.Orbs[i], settings.orbRadius, IsPaused ? 0 : Time.unscaledDeltaTime,
+                views[i].Draw(Simulation.Orbs[i], settings.orbRadius, IsPaused || Simulation.Result != MatchResult.InProgress ? 0 : Time.unscaledDeltaTime*Options.playbackSpeed,
                     Vector2.Lerp(previousPositions[i], Simulation.Orbs[i].Position, alpha),
-                    Mathf.LerpAngle(previousAngles[i], Simulation.Orbs[i].Angle, alpha));
-            feedback.Draw(IsPaused ? 0 : Time.unscaledDeltaTime);
+                    previousAngles[i]+Simulation.Orbs[i].AngularTravel*alpha);
+            projectileView.Draw(Simulation, alpha);
+            feedback.Draw(IsPaused || Simulation.Result != MatchResult.InProgress ? 0 : Time.unscaledDeltaTime * Options.playbackSpeed);
             ui.RefreshFight();
         }
         void OnCombatEvent(CombatEvent e)
@@ -116,6 +119,7 @@ namespace ArmOrb
             if (Simulation != null) Simulation.Event -= OnCombatEvent;
             foreach (var view in views) if (view) view.Remove();
             feedback.Clear();
+            projectileView?.Clear();
         }
         void OnApplicationPause(bool paused)
         {
@@ -138,10 +142,10 @@ namespace ArmOrb
                 if (string.IsNullOrEmpty(value)) return;
                 string[] parts = value.Split(',');
                 if (parts.Length < 5) return;
-                Selection[0] = Mathf.Clamp(int.Parse(parts[0]), 0, 4); Selection[1] = Mathf.Clamp(int.Parse(parts[1]), 0, 4);
+                Selection[0] = Mathf.Clamp(int.Parse(parts[0]), 0, weapons.Length - 1); Selection[1] = Mathf.Clamp(int.Parse(parts[1]), 0, weapons.Length - 1);
                 Health[0] = Mathf.Clamp(int.Parse(parts[2]), 1, 99999); Health[1] = Mathf.Clamp(int.Parse(parts[3]), 1, 99999);
                 LastSeed = int.Parse(parts[4]); StartFight(true);
-                intent.Call<AndroidJavaObject>("removeExtra", "armorb.qa")?.Dispose();
+                intent.Call("removeExtra", "armorb.qa");
             }
             catch (Exception e) { Debug.LogWarning("ArmOrb QA intent ignored: " + e.Message); }
 #endif
@@ -163,6 +167,8 @@ namespace ArmOrb
                     Gizmos.DrawLine(b.Corner(1,1),b.Corner(1,-1)); Gizmos.DrawLine(b.Corner(1,-1),b.Corner(-1,-1));
                 }
             }
+            foreach(var p in Simulation.Projectiles) { Gizmos.color=Color.yellow; Gizmos.DrawWireSphere(p.Position,p.Radius); }
+            foreach(var w in Simulation.Waves) { Gizmos.color=new Color(1,0.4f,0); Gizmos.DrawWireSphere(w.Position,w.Radius); }
         }
     }
 }

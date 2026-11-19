@@ -51,7 +51,7 @@ namespace ArmOrb
         }
         public void Show(CombatEvent e, Color tint)
         {
-            if (e.Kind == CombatEventKind.Finished) return;
+            if (e.Kind == CombatEventKind.Finished || e.Kind == CombatEventKind.Shot || e.Kind == CombatEventKind.Explosion) return;
             bool impact = e.Kind == CombatEventKind.Hit || e.Kind == CombatEventKind.Poison || e.Kind == CombatEventKind.Block;
             if (impact || e.Kind == CombatEventKind.Clash)
             {

@@ -75,7 +75,7 @@ namespace ArmOrb.Tests
         }
         [Test] public void WeaponCollidersMatchOpaqueTexelsAfterRotation()
         {
-            for(int kind=0;kind<5;kind++)
+            for(int kind=0;kind<10;kind++)
             {
                 var state=new WeaponState((WeaponKind)kind,reach:kind==1?3:2.6f);
                 var parts=new WeaponPartPose[2];int count=WeaponGeometry.GetParts(state,parts);
