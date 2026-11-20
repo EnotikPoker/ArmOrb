@@ -1,13 +1,15 @@
-# ArmOrb — Android v0.5.1
+# ArmOrb — Android v0.6.0
 
-[Скачать APK v0.5.1](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.5.1.apk)
+[Скачать APK v0.6.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.6.0.apk)
 
-Бои на 2–5 шаров, ставки на игровые монеты, случайные условия и коэффициенты по скрытым симуляциям. Мягкое сближение после затишья, настоящий разгон безоружного, ограниченный кинжал, усиленные копьё и посох. Сужающаяся опасная зона завершает затяжные бои; незавершённая ставка сохраняется. В патче исправлен угол оружия на паузе после восстановления.
+Новый режим «Битва с ботами»: своё оружие, 1–4 ботов, три сложности, 300 HP и карты 8–14. Арена сверху, внизу — рисование знаков, цепочки плиток или нажатия в ритм для заработка эссенции. На 20/40/60/80 с — магазины с лечением, защитой, усилением оружия и помехами выбранному врагу. Боты тоже покупают улучшения; матч сохраняется.
 
-Android 8.0+, ARM64, портретная ориентация. Development-сборка, versionCode 6, прежняя отладочная подпись. Устанавливается обновлением без удаления данных. Боевая модель и кошелёк проверены 86 EditMode-тестами и серией 126 боёв на компьютере. На Xiaomi/POCO 23122PCD1G проверены ставки, восстановление после перезапуска и обновления APK, бой на пять участников и скорости x1/x2. В измеренных окнах около 59–60 FPS; подробности и ограничения в отчёте.
+Клинок разгоняется без потолка с уменьшающимся приростом. Лук продолжает вращаться во время очереди. Перезарядка сюрикена 0,8 с. Режимы «Ставки» и «Тест» сохранены. Незавершённая ставка старой версии возвращается без сброса монет.
 
-[Исходный Unity-проект](https://github.com/EnotikPoker/ArmOrb/tree/a62181e5b04fe6e3d1dc1a91eda928dc75f5168e) · [README](https://github.com/EnotikPoker/ArmOrb/blob/a62181e5b04fe6e3d1dc1a91eda928dc75f5168e/README.md) · [Проверки](https://github.com/EnotikPoker/ArmOrb/blob/a62181e5b04fe6e3d1dc1a91eda928dc75f5168e/docs/VALIDATION.md) · [Физика и баланс](https://github.com/EnotikPoker/ArmOrb/blob/a62181e5b04fe6e3d1dc1a91eda928dc75f5168e/docs/ACTIVE_COMBAT.md)
+Android 8.0+, ARM64, портретная ориентация. Development-сборка, versionCode 7, прежняя отладочная подпись. Устанавливается обновлением без удаления данных. 114 EditMode-тестов и 66 сравнительных боёв на компьютере. На Xiaomi/POCO 23122PCD1G проверены знаки, плитки, магазины, боты, завершение матча и восстановление после одного перезапуска. В измеренных окнах четырёх и пяти участников 59,6–59,9 FPS. Ритм проверен автоматическими сценариями модели; подробности и ограничения в отчёте.
 
-Коммит исходников: `a62181e5b04fe6e3d1dc1a91eda928dc75f5168e`. Размер APK: 29091520 байт. SHA-256: `cf02a46508f16bc1728123ccdbb7924e8a0f2161edd2afbfb82817c1f9be2373`. Все контрольные суммы — в `SHA256SUMS`.
+[Исходный Unity-проект](https://github.com/EnotikPoker/ArmOrb/tree/5c94a6add7c380fcc77edfb36af38182cd36052f) · [README](https://github.com/EnotikPoker/ArmOrb/blob/5c94a6add7c380fcc77edfb36af38182cd36052f/README.md) · [Новый режим](https://github.com/EnotikPoker/ArmOrb/blob/5c94a6add7c380fcc77edfb36af38182cd36052f/docs/BOT_BATTLE.md) · [Проверки](https://github.com/EnotikPoker/ArmOrb/blob/5c94a6add7c380fcc77edfb36af38182cd36052f/docs/VALIDATION.md)
 
-Предыдущие APK: [v0.5.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.5.0.apk) · [v0.4.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.4.0.apk) · [v0.3.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.3.0.apk) · [v0.2.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.2.0.apk) · [v0.1.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.1.0.apk).
+Коммит исходников: `5c94a6add7c380fcc77edfb36af38182cd36052f`. Размер APK: 29159244 байта. SHA-256: `4fa8cd5787e7ec3ff05a61b0ce187ac43d2dbf142bd7032d85cd81275144d22e`. Все контрольные суммы — в `SHA256SUMS`.
+
+Предыдущие APK: [v0.5.1](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.5.1.apk) · [v0.5.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.5.0.apk) · [v0.4.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.4.0.apk) · [v0.3.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.3.0.apk) · [v0.2.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.2.0.apk) · [v0.1.0](https://github.com/EnotikPoker/ArmOrb/raw/refs/heads/android-builds/ArmOrb-v0.1.0.apk).
