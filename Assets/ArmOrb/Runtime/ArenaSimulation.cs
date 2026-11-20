@@ -87,13 +87,14 @@ namespace ArmOrb
         void Substep(float dt)
         {
             elapsed+=dt;
+            TickUpgrades(dt);
             for(int i=0;i<Orbs.Length;i++)
             {
                 var orb=Orbs[i];alive[i]=!orb.Health.IsDead;
                 start[i]=end[i]=orb.Position;startAngle[i]=orb.Angle;deltaAngle[i]=0;
                 if(!alive[i]){geometry[i].Count=0;continue;}
                 Guide(i,dt);incoming[i]=orb.Velocity;
-                deltaAngle[i]=orb.Weapon.IsBursting?0:orb.RotationDirection*orb.Weapon.RotationSpeed*dt;
+                deltaAngle[i]=orb.RotationDirection*orb.Weapon.RotationSpeed*dt;
                 if(OrbMotion.Move(orb,dt,Size*0.5f,Radius,Gravity,Restitution,MinimumBounce)) Emit(CombatEventKind.Wall,orb.Position,i);
                 orb.Weapon.MeasureSpeed(orb.Velocity);impactDamage[i]=orb.Weapon.Damage;
                 orb.Angle=Mathf.Repeat(orb.Angle+deltaAngle[i],360);orb.AngularTravel+=deltaAngle[i];
@@ -125,7 +126,7 @@ namespace ArmOrb
                 { Orbs[i].Health.Damage(Orbs[i].Health.PoisonPerSecond);lastDamage=Elapsed;Emit(CombatEventKind.Poison,Orbs[i].Position,i,Orbs[i].Health.PoisonPerSecond); }
             }
             if(Danger&&Elapsed>=90)for(int i=0;i<Orbs.Length;i++)if(alive[i]&&(Elapsed>=120||Orbs[i].Position.sqrMagnitude>SafeRadius*SafeRadius))
-                Orbs[i].Health.Damage(DangerDamage*dt);
+                Orbs[i].Health.DangerDamage(DangerDamage*dt);
             int remaining=0,winner=-1;
             for(int i=0;i<Orbs.Length;i++) { Orbs[i].Weapon.MeasureSpeed(Orbs[i].Velocity);if(!Orbs[i].Health.IsDead){remaining++;winner=i;} }
             if(remaining<=1)

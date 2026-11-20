@@ -9,7 +9,10 @@ namespace ArmOrb
         public float PoisonPerSecond { get; private set; }
         public bool IsDead => Current <= 0;
         public HealthState(float health) { Maximum = Current = Mathf.Max(1, health); }
-        public void Damage(float amount) => Current = Mathf.Max(0, Current - Mathf.Max(0, amount));
+        public void Damage(float amount) => Current = Mathf.Max(0, Current - Mathf.Max(0, amount) * DamageMultiplier);
+        public void DangerDamage(float amount) => Current = Mathf.Max(0, Current - Mathf.Max(0, amount));
+        public float DamageMultiplier = 1;
+        public void Heal(float amount) { if (!IsDead) Current = Mathf.Min(Maximum, Current + Mathf.Max(0, amount)); }
         public void AddPoison(float amount) => PoisonPerSecond += Mathf.Max(0, amount);
     }
 
@@ -22,15 +25,16 @@ namespace ArmOrb
         readonly float initialUnarmedMaxSpeed;
         public float UnarmedMaxSpeed => initialUnarmedMaxSpeed+SpeedBonus;
         public float SpeedUnit { get; }
-        public float UnarmedWorldLimit => UnarmedMaxSpeed*SpeedUnit;
+        float purchasedSpeedMultiplier = 1;
+        public float UnarmedWorldLimit => UnarmedMaxSpeed*SpeedUnit*purchasedSpeedMultiplier;
         public void MeasureSpeed(Vector2 velocity) => CurrentSpeed=velocity.magnitude/(Kind==WeaponKind.Unarmed?SpeedUnit:1);
         public float Reach { get; private set; }
         public float RotationSpeed { get; private set; }
         public float Reflection => 1;
         public float ShieldWidth { get; private set; } = 2.1f;
-        public float Growth { get; }
+        public float Growth { get; private set; }
         public WeaponShapeData Shape { get; }
-        public float MaximumRotationSpeed { get; }
+        readonly double rotationGrowthSquared;
         public bool IsRanged => Kind == WeaponKind.Bow || Kind == WeaponKind.Staff || Kind == WeaponKind.Shuriken || Kind == WeaponKind.Crossbow;
         public bool IsMelee => !IsRanged && Kind != WeaponKind.Unarmed;
         public float SpeedBonus { get; private set; }
@@ -44,18 +48,17 @@ namespace ArmOrb
         public float BurstInterval { get; }
         public int BurstRemaining;
         public float BurstDelay;
-        public float BurstAngle;
         public bool IsBursting => Kind == WeaponKind.Bow && BurstRemaining > 0;
         public int Hits { get; private set; }
         public int Blocks { get; private set; }
         public WeaponState(WeaponKind kind, float damage = 1, float reach = 2.6f,
             float rotationSpeed = 300, float growth = 1, float reflection = 1, WeaponShapeDefinition shape = null,
-            float cooldown = 1, float projectileSpeed = 14, float blastRadius = 1.1f, float waveSpeed = 6, float burstInterval = 0.06f, float unarmedMaxSpeed = 4, float unarmedSpeedUnit = 1.6f, float maximumRotationSpeed = 1800, WeaponShapeData geometry = null)
+            float cooldown = 1, float projectileSpeed = 14, float blastRadius = 1.1f, float waveSpeed = 6, float burstInterval = 0.06f, float unarmedMaxSpeed = 4, float unarmedSpeedUnit = 1.6f, WeaponShapeData geometry = null)
         {
             Kind = kind; Damage = kind == WeaponKind.Shield ? 0 : damage; Reach = reach;
             RotationSpeed = rotationSpeed; Growth = growth;
             Shape = geometry ?? new WeaponShapeData(shape ? shape : WeaponShapeDefinition.Get(kind));
-            MaximumRotationSpeed = Mathf.Max(rotationSpeed, maximumRotationSpeed);
+            rotationGrowthSquared = 2.0 * rotationSpeed * growth + growth * growth;
             Cooldown = Mathf.Max(0.05f, cooldown); ProjectileSpeed = Mathf.Max(0.1f, projectileSpeed);
             BlastRadius = Mathf.Max(0.01f, blastRadius); WaveSpeed = Mathf.Max(0.1f, waveSpeed);
             initialUnarmedMaxSpeed=Mathf.Max(0.1f,unarmedMaxSpeed); SpeedUnit=Mathf.Max(0.1f,unarmedSpeedUnit);
@@ -75,8 +78,23 @@ namespace ArmOrb
                 case WeaponKind.Shuriken: Bounces++; break;
                 case WeaponKind.Sword: Damage += Growth; break;
                 case WeaponKind.Spear: Reach += Growth; break;
-                case WeaponKind.Blade: RotationSpeed = Mathf.Min(MaximumRotationSpeed, RotationSpeed + Growth); break;
+                case WeaponKind.Blade: RotationSpeed = (float)System.Math.Sqrt((double)RotationSpeed * RotationSpeed + rotationGrowthSquared); break;
                 case WeaponKind.Scythe: target.AddPoison(Growth); break;
+            }
+        }
+        public void Upgrade()
+        {
+            switch (Kind)
+            {
+                case WeaponKind.Sword: Damage += 2; break;
+                case WeaponKind.Spear: Reach += 0.75f; break;
+                case WeaponKind.Blade: RotationSpeed *= 1.2f; break;
+                case WeaponKind.Scythe: Growth += 1; break;
+                case WeaponKind.Shield: ShieldWidth += 0.5f; break;
+                case WeaponKind.Unarmed: purchasedSpeedMultiplier += 0.1f; break;
+                case WeaponKind.Bow: case WeaponKind.Crossbow: ArrowCount += 2; break;
+                case WeaponKind.Staff: BlastRadius += 0.5f; break;
+                case WeaponKind.Shuriken: Bounces += 2; break;
             }
         }
         // A block alone never grows the shield. Growth is credited only after returned damage lands.
@@ -98,6 +116,8 @@ namespace ArmOrb
 
     public sealed class CombatantState
     {
+        public int ArmorRanks, WeaponRanks;
+        public float VulnerableRemaining, ToxicRemaining;
         public Vector2 Position;
         public Vector2 Velocity;
         public float Angle;

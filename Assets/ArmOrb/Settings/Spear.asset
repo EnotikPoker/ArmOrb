@@ -30,4 +30,3 @@ MonoBehaviour:
   unarmedMaxSpeed: 4
   unarmedSpeedUnit: 1.6
   projectileSprite: {fileID: 0}
-  maximumRotationSpeed: 1800

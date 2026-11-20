@@ -14,10 +14,10 @@ namespace ArmOrb.Tests
         static SimulationFactory Factory()=>new SimulationFactory(Assets(),AssetDatabase.LoadAssetAtPath<ArenaSettings>("Assets/ArmOrb/Settings/Arena.asset"));
         static FightDefinition F(int[] weapons,int hp=100,bool gravity=true)=>new FightDefinition{weapons=weapons,health=Enumerable.Repeat(hp,weapons.Length).ToArray(),gravity=gravity,seed=104729};
         static void Run(ArenaSimulation sim,float seconds){for(int t=0;t<Mathf.CeilToInt(seconds*120)&&sim.Result==MatchResult.InProgress;t++)sim.Step(1f/120);}
-        [Test] public void RuntimeAssetsHaveNewBalanceAndRealBladeCap()
+        [Test] public void RuntimeAssetsKeepSpearAndStaffBalanceWithUncappedBlade()
         {
             var definitions=Assets();var blade=definitions[2].CreateState();for(int i=0;i<100;i++)blade.OnHit(new HealthState(100));
-            Assert.That(blade.RotationSpeed,Is.EqualTo(1800));Assert.That(definitions[2].growth,Is.EqualTo(300));Assert.That(definitions[2].damage,Is.EqualTo(2));
+            Assert.That(blade.RotationSpeed,Is.InRange(3900,4000));Assert.That(definitions[2].growth,Is.EqualTo(120));Assert.That(definitions[2].damage,Is.EqualTo(2));
             Assert.That(definitions[1].damage,Is.EqualTo(2));Assert.That(definitions[1].reach,Is.EqualTo(3.5f));
             Assert.That(definitions[7].damage,Is.EqualTo(3));Assert.That(definitions[7].cooldown,Is.EqualTo(1));Assert.That(definitions[7].blastRadius,Is.EqualTo(1.5f));
         }

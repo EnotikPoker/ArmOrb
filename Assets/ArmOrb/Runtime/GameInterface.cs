@@ -5,7 +5,7 @@ using UnityEngine.UIElements;
 
 namespace ArmOrb
 {
-    public sealed class GameInterface
+    public sealed partial class GameInterface
     {
         readonly ArmOrbGame game;
         readonly VisualElement root;
@@ -30,21 +30,22 @@ namespace ArmOrb
         static void Classes(VisualElement e,string classes){if(classes!=null)foreach(string c in classes.Split(' '))e.AddToClassList(c);}
         static void Selected(VisualElement e,bool selected)=>e.EnableInClassList("selected",selected);
         void NewPage()
-        {root.Clear();overlay=null;calculation=null;speeds.Clear();app=Element(root,"app");previousSize=Vector2Int.zero;UpdateSafeArea();}
+        {CancelMiniGesture();miniView=null;essenceLabel=null;miniFeedback=null;root.Clear();overlay=null;calculation=null;speeds.Clear();app=Element(root,"app");previousSize=Vector2Int.zero;UpdateSafeArea();}
         public void ShowSetup()=>ShowHome();
         public void ShowHome()
         {
             NewPage();
             var header=Element(app,"row header");Text(header,"ARMORB","logo");Text(header,$"{game.Wallet.Data.balance:N0} монет","balance");
             var tabs=Element(app,"row mode-tabs");
-            var bets=Button(tabs,"Ставки",()=>game.SelectMode(false),"mode-tab");Selected(bets,!game.ShowTest);bets.name="mode-bets";
-            var test=Button(tabs,"Тест",()=>game.SelectMode(true),"mode-tab");Selected(test,game.ShowTest);test.name="mode-test";
+            var bets=Button(tabs,"Ставки",()=>game.SelectMode(GameMode.Bets),"mode-tab");Selected(bets,game.Mode==GameMode.Bets);bets.name="mode-bets";
+            var test=Button(tabs,"Тест",()=>game.SelectMode(GameMode.Test),"mode-tab");Selected(test,game.ShowTest);test.name="mode-test";
+            var bots=Button(tabs,"С ботами",()=>game.SelectMode(GameMode.Bots),"mode-tab");Selected(bots,game.Mode==GameMode.Bots);bots.name="mode-bots";
             var scroll=new ScrollView(ScrollViewMode.Vertical);scroll.AddToClassList("setup-scroll");app.Add(scroll);
             var content=Element(scroll.contentContainer,"home-content");
             if(!string.IsNullOrEmpty(game.Error))Text(content,game.Error,"error");
             if(!string.IsNullOrEmpty(game.Wallet.RecoveryMessage))Text(content,game.Wallet.RecoveryMessage,"small muted");
-            if(game.ShowTest)TestSetup(content);else BetSetup(content);
-            var footer=Element(app,"row footer");Button(footer,"Правила · v0.5",ShowRules,"text-button");sound=Button(footer,"",game.ToggleSound,"text-button");RefreshSound();
+            if(game.ShowTest)TestSetup(content);else if(game.Mode==GameMode.Bots)BotSetup(content);else BetSetup(content);
+            var footer=Element(app,"row footer");Button(footer,"Правила · v0.6",ShowRules,"text-button");sound=Button(footer,"",game.ToggleSound,"text-button");RefreshSound();
         }
         void TestSetup(VisualElement content)
         {
@@ -150,6 +151,7 @@ namespace ArmOrb
         public void RefreshSpeed(){foreach(var pair in speeds)Selected(pair.button,Mathf.Approximately(pair.speed,game.Options.playbackSpeed));}
         public void ShowFight()
         {
+            if(game.IsBotFight){ShowBotFight();return;}
             NewPage();hp.Clear();stats.Clear();reload.Clear();
             var header=Element(app,"row header");Button(header,"Меню",game.BackToSetup,"header-button").name="fight-menu";timer=Text(header,"00:00","timer");Button(header,"Пауза",game.TogglePause,"header-button").name="pause";
             var participants=Element(app,"fight-participants");
@@ -169,6 +171,7 @@ namespace ArmOrb
         public void RefreshFight()
         {
             if(game.Simulation==null||timer==null||hp.Count!=game.Simulation.Orbs.Length)return;
+            RefreshMiniGame();
             var sim=game.Simulation;timer.text=$"{(int)sim.Elapsed/60:00}:{(int)sim.Elapsed%60:00}";
             for(int i=0;i<hp.Count;i++)
             {
@@ -212,12 +215,13 @@ namespace ArmOrb
             string[] rules={"Ставка на одного победителя до начала боя. Выплата включает поставленные монеты; при ничьей ставка возвращается.",
                 "Коэффициенты оцениваются скрытыми боями того же состава. Показанный бой использует отдельный сид.",
                 "После затишья шары плавно сближаются. С 90-й секунды сужается безопасный круг; снаружи наносится урон. С 120-й секунды опасна вся арена.",
-                "Меч: +1 урон за попадание. Копьё: 2 урона, +0,5r к длине. Кинжал: 2 урона, +300°/с, максимум 1800°/с.",
+                "Меч: +1 урон за попадание. Копьё: 2 урона, +0,5r к длине. Кинжал: 2 урона, плавный разгон без потолка.",
                 "Коса: +1/с яда на цели за удар. Безоружный: урон от текущей скорости, за попадания растёт разгон.",
                 "Щит возвращает 100% урона, сам не атакует. Снаряды меняют владельца. Успешная отражённая атака увеличивает ширину на 0,25r. Волны проходят сквозь щит.",
-                "Лук выпускает очередь с интервалом 0,06 с, арбалет — одновременный веер. Попадание добавляет стрелу следующему выстрелу. Перезарядка 1 с.",
+                "Лук выпускает очередь с интервалом 0,06 с, арбалет — одновременный веер. Попадание добавляет стрелу следующему выстрелу. Перезарядка 1 с; у сюрикена 0,8 с.",
                 "Посох: огненный шар каждую секунду; волна наносит 3 урона каждому врагу один раз. Радиус растёт на 0,35 за попадание. Сюрикен: +1 отскок за попадание.",
                 "Выбывшие больше не атакуют; уже выпущенные снаряды и наложенный яд остаются. Собственные снаряды не опасны. Усиления сбрасываются между боями.",
+                "Битва с ботами: 1–4 противника, 300 HP. Внизу — знаки, плитки или ритм для заработка эссенции. На 20/40/60/80 с магазин; с 90 с сужение. Эссенция и покупки действуют только в этом матче.",
                 "При балансе меньше 10 монет и отсутствии незавершённой ставки можно бесплатно восстановить баланс до 1000."};
             foreach(string rule in rules)Text(scroll,rule,"rule");Button(card,"Закрыть",CloseOverlay,"primary");
         }

@@ -7,7 +7,7 @@ namespace ArmOrb
     [Serializable] public sealed class PendingBet
     {
         public string id;
-        public string rules="0.5";
+        public string rules="0.6";
         public FightDefinition fight;
         public long stake;
         public int selection,oddsHundredths,ticks;
@@ -34,7 +34,7 @@ namespace ArmOrb
                 Data=new WalletData();
                 if(File.Exists(path)||File.Exists(path+".bak"))RecoveryMessage="Сохранение не удалось прочитать. Баланс восстановлен.";
             }
-            if(Data.pending!=null&&Data.pending.rules!="0.5")
+            if(Data.pending!=null&&Data.pending.rules!="0.6")
             {
                 var copy=Copy();copy.balance+=copy.pending.stake;copy.settledId=copy.pending.id;copy.pending=null;Commit(copy);
                 RecoveryMessage="Правила боя изменились. Ставка возвращена.";

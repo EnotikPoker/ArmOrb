@@ -7,16 +7,16 @@ namespace ArmOrb
     public sealed class WeaponTemplate
     {
         public readonly WeaponKind Kind;
-        readonly float damage,reach,rotation,growth,cooldown,projectileSpeed,blastRadius,waveSpeed,burstInterval,maxSpeed,speedUnit,maxRotation;
+        readonly float damage,reach,rotation,growth,cooldown,projectileSpeed,blastRadius,waveSpeed,burstInterval,maxSpeed,speedUnit;
         readonly WeaponShapeData shape;
         public WeaponTemplate(WeaponDefinition source)
         {
             Kind=source.kind;damage=source.damage;reach=source.reach;rotation=source.rotationSpeed;growth=source.growth;
             cooldown=source.cooldown;projectileSpeed=source.projectileSpeed;blastRadius=source.blastRadius;waveSpeed=source.waveSpeed;
-            burstInterval=source.burstInterval;maxSpeed=source.unarmedMaxSpeed;speedUnit=source.unarmedSpeedUnit;maxRotation=source.maximumRotationSpeed;
+            burstInterval=source.burstInterval;maxSpeed=source.unarmedMaxSpeed;speedUnit=source.unarmedSpeedUnit;
             shape=new WeaponShapeData(source.shape);
         }
-        public WeaponState CreateState()=>new WeaponState(Kind,damage,reach,rotation,growth,1,null,cooldown,projectileSpeed,blastRadius,waveSpeed,burstInterval,maxSpeed,speedUnit,maxRotation,shape);
+        public WeaponState CreateState()=>new WeaponState(Kind,damage,reach,rotation,growth,1,null,cooldown,projectileSpeed,blastRadius,waveSpeed,burstInterval,maxSpeed,speedUnit,shape);
     }
     [Serializable]
     public sealed class FightDefinition
