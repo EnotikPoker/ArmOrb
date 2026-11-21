@@ -14,12 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: ArmOrb.Runtime::ArmOrb.WeaponDefinition
   kind: 2
   displayName: "\u041A\u043B\u0438\u043D\u043E\u043A"
-  description: "+300\xB0/\u0441 \xB7 \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C
-    1800\xB0/\u0441"
+  description: "Ускорение за попадание · без потолка"
   damage: 2
   reach: 1.8
   rotationSpeed: 573
-  growth: 300
+  growth: 120
   sprite: {fileID: 21300000, guid: d76d2642de4b89be790bc244800d107a, type: 3}
   prefab: {fileID: 8235528745497329467, guid: da420ec06af272b058a496181cedee52, type: 3}
   shape: {fileID: 11400000, guid: 918f2e11cd1ac8e88a933ed12bb93671, type: 2}
@@ -31,4 +30,3 @@ MonoBehaviour:
   unarmedMaxSpeed: 4
   unarmedSpeedUnit: 1.6
   projectileSprite: {fileID: 0}
-  maximumRotationSpeed: 1800

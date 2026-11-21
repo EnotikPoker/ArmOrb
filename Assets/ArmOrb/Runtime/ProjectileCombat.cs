@@ -19,7 +19,7 @@ namespace ArmOrb
             int count = weapon.Kind == WeaponKind.Crossbow ? weapon.ArrowCount : 1;
             for (int i = 0; i < count; i++)
             {
-                float angle = (single ? weapon.BurstAngle : orb.Angle) + (count == 1 ? 0 : -30 + 60f * i / (count - 1));
+                float angle = orb.Angle + (count == 1 ? 0 : -30 + 60f * i / (count - 1));
                 Vector2 direction = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad));
                 var p = freeProjectiles.Count > 0 ? freeProjectiles.Pop() : new ProjectileState();
                 p.Id = ++nextEffectId; p.Owner = side; p.Kind = weapon.Kind;
@@ -135,7 +135,7 @@ namespace ArmOrb
                 {
                     if(weapon.Kind==WeaponKind.Bow)
                     {
-                        weapon.BurstRemaining=weapon.ArrowCount; weapon.BurstAngle=Orbs[side].Angle;
+                        weapon.BurstRemaining=weapon.ArrowCount;
                         weapon.BurstDelay=0;ReleaseBowArrow(side);
                     }
                     else { Fire(side); weapon.ReloadRemaining+=weapon.Cooldown; }

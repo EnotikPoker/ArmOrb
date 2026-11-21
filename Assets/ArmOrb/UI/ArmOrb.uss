@@ -119,3 +119,22 @@ Button:focus { border-color: #111111; }
 .danger-label { min-height: 25px; font-size: 16px; color: #b55226; margin: 4px 0; }
 .fight-stats { flex-shrink: 0; margin: 8px 0 12px; }
 .fighter-stat { font-size: 15px; min-height: 23px; }
+/* v0.6 */
+.mode-tab { width: 32%; font-size: 20px; }
+.mini-description { margin-top: 14px; }
+.bot-preview-line { font-size: 20px; margin-top: 6px; }
+.bot-fight .header { height: 48px; }
+.bot-fight .fight-participants { margin-top: 2px; }
+.bot-fight .fight-participant { padding-top: 3px; padding-bottom: 3px; }
+.bot-fight .fighter-label { font-size: 17px; }
+.bot-fight .fight-hp { font-size: 18px; }
+.bot-arena-holder { flex-grow: 0; flex-shrink: 1; min-height: 180px; }
+.essence-row { min-height: 44px; flex-shrink: 0; border-bottom-width: 1px; border-bottom-color: #d5d5d0; }
+.essence { font-size: 24px; -unity-font-style: bold; color: #7350b1; }
+.mini-panel { flex-grow: 1; min-height: 220px; padding: 8px 12px; background-color: white; border-width: 1px; border-color: #d5d5d0; margin-top: 8px; }
+.mini-title { font-size: 24px; -unity-font-style: bold; }
+.mini-canvas { flex-grow: 1; min-height: 120px; margin-top: 4px; }
+.mini-feedback { font-size: 18px; min-height: 26px; color: #7350b1; -unity-text-align: middle-center; }
+.shop-item { border-width: 1px; border-color: #d5d5d0; padding: 12px; margin-bottom: 10px; }
+.shop-item .wide-field { margin-top: 8px; font-size: 18px; }
+.shop-buy { margin-top: 10px; min-height: 48px; }

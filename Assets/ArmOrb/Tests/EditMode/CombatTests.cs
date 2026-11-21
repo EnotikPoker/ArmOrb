@@ -15,11 +15,12 @@ namespace ArmOrb.Tests
             for (int i = 0; i < 3; i++) { target.Damage(sword.Damage); sword.OnHit(target); }
             Assert.That(target.Current, Is.EqualTo(94)); Assert.That(sword.Damage, Is.EqualTo(4));
         }
-        [Test] public void SpearGrowsAndBladeStopsAtItsRotationCap()
+        [Test] public void SpearGrowsAndBladeKeepsAcceleratingWithSmallerIncrements()
         {
             var target = new HealthState(10000); var spear = Weapon(WeaponKind.Spear); var blade = Weapon(WeaponKind.Blade);
-            for (int i = 0; i < 200; i++) { spear.OnHit(target); blade.OnHit(target); }
-            Assert.That(spear.Reach, Is.EqualTo(103)); Assert.That(blade.RotationSpeed, Is.EqualTo(1800));
+            for (int i = 0; i < 2000; i++) { spear.OnHit(target); blade.OnHit(target); }
+            Assert.That(spear.Reach, Is.EqualTo(1003)); Assert.That(blade.RotationSpeed, Is.GreaterThan(1800));
+            float before=blade.RotationSpeed;blade.OnHit(target);Assert.That(blade.RotationSpeed-before,Is.InRange(0.001f,29.99f));
             Assert.That(spear.Damage, Is.EqualTo(1)); Assert.That(blade.Damage, Is.EqualTo(1));
         }
         [Test] public void PoisonStacksOnTargetAndPersists()

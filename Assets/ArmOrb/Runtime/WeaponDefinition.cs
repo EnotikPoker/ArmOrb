@@ -30,10 +30,9 @@ namespace ArmOrb
         [Tooltip("World units per point of Speed/Damage, calibrated to the reference arena.")]
         [Min(0.1f)] public float unarmedSpeedUnit = 1.6f;
         public Sprite projectileSprite;
-        [Min(1)] public float maximumRotationSpeed = 1800;
 
         public WeaponState CreateState() => new WeaponState(kind, damage, reach, rotationSpeed, growth, 1, shape,
-            cooldown, projectileSpeed, blastRadius, waveSpeed, burstInterval, unarmedMaxSpeed, unarmedSpeedUnit, maximumRotationSpeed);
+            cooldown, projectileSpeed, blastRadius, waveSpeed, burstInterval, unarmedMaxSpeed, unarmedSpeedUnit);
 
         public WeaponTemplate Snapshot() => new WeaponTemplate(this);
     }
