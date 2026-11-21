@@ -37,13 +37,9 @@ namespace ArmOrb.Editor
                 var m=new BotMatchController(factory,f,(MiniGameKind)level,(BotDifficulty)level);var watch=Stopwatch.StartNew();float peak=0;int tick=0;
                 while(m.Data.phase!=BotPhase.Finished&&tick++<120*136)
                 {
-                    if(m.Active){if(tick%120==0)m.Earn(2);m.Tick(1f/120);Validate(m.Simulation,ref peak);}
-                    else
-                    {
-                        for(int slot=0;slot<m.Data.cards.Length;slot++)
-                        {int target=Enumerable.Range(1,f.Count-1).FirstOrDefault(i=>!m.Simulation.Orbs[i].Health.IsDead);m.Buy(slot,target);}
-                        m.Continue();
-                    }
+                    if(tick%120==0&&m.Data.phase==BotPhase.Combat)m.Earn(2);
+                    m.Tick(1f/120);Validate(m.Simulation,ref peak);
+                    if(m.Data.offers[0].open)m.Choose(m.AutoChoice());
                 }
                 if(m.Data.phase!=BotPhase.Finished)throw new Exception("Unfinished bot match");
                 Write(csv,"bots-"+level,f,m.Simulation,m.Data.visit,peak,watch.Elapsed.TotalSeconds);count++;

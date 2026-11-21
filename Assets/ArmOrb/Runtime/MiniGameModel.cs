@@ -10,7 +10,7 @@ namespace ArmOrb
         public bool initialized;
         public int drawingTarget;
         public int[] tiles = new int[16];
-        public float clock, rhythmTarget = 0.5f, drawingCooldown;
+        public float clock, rhythmTarget = 0.5f, drawingCooldown, restRemaining;
         public bool rhythmTapped;
     }
     public interface IMiniGame
@@ -24,6 +24,7 @@ namespace ArmOrb
         public MiniGameData Data { get; }
         public string Feedback { get; private set; } = "";
         public static readonly string[] DrawingNames = { "Линия", "Угол", "Зигзаг", "Треугольник", "Квадрат", "Круг" };
+        public bool Ready => Data.restRemaining <= 0;
         public float Cursor => Data.clock / 1.2f;
         public MiniGameModel(MiniGameKind kind, MiniGameData data)
         {
@@ -39,35 +40,48 @@ namespace ArmOrb
         {
             if (data.tiles == null || data.tiles.Length != 16 || data.drawingTarget < 0 || data.drawingTarget >= 6 ||
                 !float.IsFinite(data.clock) || data.clock < 0 || data.clock > 1.21f || !float.IsFinite(data.rhythmTarget) || data.rhythmTarget < 0.2f || data.rhythmTarget > 0.8f ||
-                !float.IsFinite(data.drawingCooldown) || data.drawingCooldown < 0 || data.drawingCooldown > 0.3f) return false;
+                !float.IsFinite(data.drawingCooldown) || data.drawingCooldown < 0 || data.drawingCooldown > 0.3f ||
+                !float.IsFinite(data.restRemaining) || data.restRemaining < 0 || data.restRemaining > 3) return false;
             foreach (int tile in data.tiles) if (tile < 0 || tile > 3) return false; return true;
         }
         public void Tick(float seconds)
         {
             Data.drawingCooldown = Mathf.Max(0, Data.drawingCooldown - seconds);
+            if (!Ready)
+            {
+                Data.restRemaining = Mathf.Max(0, Data.restRemaining - seconds);
+                if (Data.restRemaining < 0.00002f) Data.restRemaining = 0;
+                if (Ready && Kind == MiniGameKind.Rhythm) RestartRhythm();
+                return;
+            }
             if (Kind != MiniGameKind.Rhythm) return;
             Data.clock += seconds;
             while (Data.clock >= 1.2f) { Data.clock -= 1.2f; NextRhythm(); }
         }
+        public void ResumeAfterChoice()
+        { Data.restRemaining = 0; Data.drawingCooldown = 0; Feedback = ""; if (Kind == MiniGameKind.Rhythm) RestartRhythm(); }
+        void RestartRhythm() { Data.clock = 0; NextRhythm(); }
+        void Success() { Data.restRemaining = 3; }
         void NextRhythm() { Data.rhythmTarget = 0.25f + 0.5f * MatchRandom.Unit(ref Data.random); Data.rhythmTapped = false; }
         public int TapRhythm()
         {
-            if (Data.rhythmTapped) return 0;
+            if (!Ready || Data.rhythmTapped) return 0;
             Data.rhythmTapped = true;
             float distance = Mathf.Abs(Cursor - Data.rhythmTarget);
-            int reward = distance <= 0.045f ? 3 : distance <= 0.12f ? 2 : 0;
-            Feedback = reward == 3 ? "Точно · +3" : reward == 2 ? "Попадание · +2" : "Мимо";
+            int reward = distance <= 0.045f ? 12 : distance <= 0.12f ? 8 : 0;
+            Feedback = reward == 12 ? "Точно · +12" : reward == 8 ? "Попадание · +8" : "Мимо";
+            if (reward > 0) Success();
             return reward;
         }
-        public void SkipDrawing() { NextDrawing(); Feedback = ""; }
+        public void SkipDrawing() { if (!Ready) return; NextDrawing(); Feedback = ""; }
         void NextDrawing() { Data.drawingTarget = (Data.drawingTarget + 1 + MatchRandom.Range(ref Data.random, 5)) % 6; }
         public int SubmitDrawing(IReadOnlyList<Vector2> points, float duration)
         {
-            if (Data.drawingCooldown > 0) return 0;
+            if (!Ready || Data.drawingCooldown > 0) return 0;
             float score = points.Count >= 2 && duration >= 0.12f ? DrawingDistance(points, Data.drawingTarget) : float.PositiveInfinity;
-            int reward = score <= 0.10f ? 5 : score <= 0.20f ? 3 : 0;
-            Feedback = reward == 5 ? "Точно · +5" : reward == 3 ? "Знак принят · +3" : "Не похоже — попробуй ещё";
-            if (reward > 0) NextDrawing();
+            int reward = score <= 0.10f ? 12 : score <= 0.20f ? 8 : 0;
+            Feedback = reward == 12 ? "Точно · +12" : reward == 8 ? "Знак принят · +8" : "Не похоже — попробуй ещё";
+            if (reward > 0) { NextDrawing(); Success(); }
             Data.drawingCooldown = 0.18f; return reward;
         }
         public static List<Vector2> Template(int target)
@@ -137,6 +151,7 @@ namespace ArmOrb
         }
         public int SubmitChain(IReadOnlyList<int> chain)
         {
+            if (!Ready) return 0;
             var verified = new List<int>(); foreach (int tile in chain) { if (!CanAppend(verified,tile)) return 0; verified.Add(tile); }
             if (chain.Count < 3) { Feedback = "Соедини хотя бы три"; return 0; }
             foreach (int tile in chain) Data.tiles[tile] = -1;
@@ -146,7 +161,7 @@ namespace ArmOrb
                 for (int row = 3; row >= 0; row--) if (Data.tiles[row*4+col] >= 0) Data.tiles[write--*4+col] = Data.tiles[row*4+col];
                 while (write >= 0) Data.tiles[write--*4+col] = MatchRandom.Range(ref Data.random,4);
             }
-            EnsureMove(); int reward = chain.Count-1; Feedback = $"Цепочка {chain.Count} · +{reward}"; return reward;
+            EnsureMove(); int reward = Mathf.Min(12, 8 + 2 * (chain.Count - 3)); Feedback = $"Цепочка {chain.Count} · +{reward}"; Success(); return reward;
         }
         public bool HasMove()
         {

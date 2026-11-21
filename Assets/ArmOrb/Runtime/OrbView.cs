@@ -9,7 +9,26 @@ namespace ArmOrb
         public TextMesh healthLabel;
         public WeaponView Weapon { get; private set; }
         Color color;
-        int participant=-1;
+        LineRenderer focusRing, focusSeparator;
+        public static readonly Color FocusColor = new Color32(47,107,255,255);
+        public bool HasFocus => focusRing != null;
+        public static bool IsFocus(bool botFight, bool betFight, int betSelection, int id) => botFight ? id == 0 : betFight && id == betSelection;
+        public static string HealthText(float health) => Mathf.CeilToInt(health).ToString();
+        public void SetFocus(bool selected, float radius, float arenaSize, Material material)
+        {
+            if (!selected) return;
+            float width = arenaSize * .006f;
+            focusSeparator = MakeRing("Focus separator", radius + width*.9f, width*1.7f, new Color32(25,25,28,255), 8, material);
+            focusRing = MakeRing("Selected orb", radius + width*.9f, width, FocusColor, 9, material);
+        }
+        LineRenderer MakeRing(string label,float radius,float width,Color tint,int order,Material material)
+        {
+            var go = new GameObject(label);go.transform.SetParent(transform,false);
+            var line=go.AddComponent<LineRenderer>();line.sharedMaterial=material;line.loop=true;line.useWorldSpace=false;
+            line.positionCount=64;line.widthMultiplier=width;line.startColor=line.endColor=tint;line.sortingOrder=order;
+            for(int i=0;i<64;i++){float a=i*Mathf.PI*2/64;line.SetPosition(i,new Vector3(Mathf.Cos(a)*radius,Mathf.Sin(a)*radius,0));}
+            return line;
+        }
         float flash;
         readonly SpriteRenderer[] trail=new SpriteRenderer[10];
         readonly Vector2[] trailPositions=new Vector2[10];
@@ -37,7 +56,7 @@ namespace ArmOrb
         }
         public void Configure(Color tint, float radius, WeaponView weaponPrefab, int participantIndex=-1)
         {
-            color = tint; participant=participantIndex;
+            color = tint;
             body.transform.localScale = Vector3.one * (radius * 2 / body.sprite.bounds.size.x);
             shadow.transform.localScale = body.transform.localScale;
             Weapon = Instantiate(weaponPrefab, transform.parent);
@@ -47,13 +66,14 @@ namespace ArmOrb
         {
             bool dead=state.Health.IsDead;
             body.enabled=!dead;healthLabel.gameObject.SetActive(!dead);Weapon.gameObject.SetActive(!dead);
+            if(focusRing){focusRing.enabled=!dead;focusSeparator.enabled=!dead;}
             if(dead){foreach(var ghost in trail)if(ghost)ghost.enabled=false;return;}
             DrawTrail(state,dt,position);
             transform.position = position;
             flash = Mathf.Max(0, flash - dt);
             body.color = Color.Lerp(color, Color.white, flash / 0.12f);
-            healthLabel.text = (participant>=0?"#"+(participant+1)+"\n":"")+Mathf.CeilToInt(state.Health.Current);
-            healthLabel.characterSize = (participant>=0?0.065f:0.09f) * Mathf.Min(1, 3f / Mathf.CeilToInt(state.Health.Current).ToString().Length);
+            healthLabel.text = HealthText(state.Health.Current);
+            healthLabel.characterSize = 0.09f * Mathf.Min(1, 3f / healthLabel.text.Length);
             Weapon.Draw(state, radius, position, angle);
         }
         public void Remove()

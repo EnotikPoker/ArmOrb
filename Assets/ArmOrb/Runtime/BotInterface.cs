@@ -8,7 +8,11 @@ namespace ArmOrb
     public sealed partial class GameInterface
     {
         MiniGameView miniView;
-        Label essenceLabel, miniFeedback, shopCountdown;
+        Label essenceLabel, miniFeedback, skillStatus, restCountdown, restFeedback, choiceCountdown, skillNotice;
+        VisualElement taskArea, restArea, choiceArea, gaugeFill, gaugeTrack, choiceRow;
+        readonly List<Button> skillButtons = new List<Button>();
+        readonly List<Label> autoLabels = new List<Label>(), targetLabels = new List<Label>();
+        int visibleOfferId = -1;
         public void CancelMiniGesture() => miniView?.CancelGesture();
         void BotSetup(VisualElement content)
         {
@@ -18,13 +22,13 @@ namespace ArmOrb
             if(pending!=null)
             {
                 Text(content,"Незавершённая битва","section-name");
-                Text(content,$"{BotMatchController.MiniNames[(int)pending.miniGame]} · {pending.fight.Count-1} ботов · {BotMatchController.DifficultyNames[(int)pending.difficulty]}","rule");
+                Text(content,$"{BotMatchController.MiniNames[(int)pending.miniGame]} · {pending.fight.Count-1} ботов · {BotMatchController.DifficultyNames[(int)pending.difficulty]} · {BotMatchController.RewardNames[(int)pending.rewardMode]}","rule");
                 Text(content,$"Эссенция: {(int)pending.essence[0]} · время: {pending.ticks/120f:0} с","rule");
                 Button(content,"Продолжить битву",game.ResumeBots,"primary").name="continue-bots";
                 Button(content,"Завершить попытку",game.DiscardBots,"secondary").name="discard-bots";return;
             }
             Text(content,"Битва с ботами","section-name");
-            Text(content,"Развивай свой шар заданиями внизу экрана. Каждые 20 секунд — магазин. Останься последним.","rule");
+            Text(content,"Выполняй задания, пока твой шар сражается. Выбирай навыки внизу экрана — бой продолжается.","rule");
             var names=new List<string>();foreach(var w in game.weapons)names.Add(w.displayName);
             var weapon=new DropdownField("Твоё оружие",names,game.BotWeapon);weapon.AddToClassList("wide-field");weapon.name="bot-player-weapon";content.Add(weapon);
             weapon.RegisterValueChangedCallback(_=>{game.BotWeapon=weapon.index;game.ConfigureBots();});
@@ -36,12 +40,19 @@ namespace ArmOrb
             }
             string[] descriptions={"Повторяй знак справа от образца. Точный рисунок даёт больше эссенции.","Соединяй одинаковые плитки в цепочки от трёх. Двигаться можно вверх, вниз и в стороны.","Нажимай при прохождении бегунка через зелёную область. Центр даёт больше эссенции."};
             Text(content,descriptions[(int)game.BotMini],"rule mini-description");
+            var modes=Element(content,"row reward-options");
+            for(int i=0;i<2;i++)
+            {
+                int selected=i;var button=Button(modes,BotMatchController.RewardNames[i],()=>{game.BotReward=(RewardMode)selected;game.ConfigureBots();},"segment reward-segment");
+                Selected(button,(int)game.BotReward==i);button.name=i==0?"reward-gauge":"reward-timed";
+            }
+            Text(content,game.BotReward==RewardMode.Gauge?"60 эссенции → один из трёх навыков. На выбор 7 секунд.":"Каждые 30 секунд — покупка одного из трёх навыков. На выбор 7 секунд.","small muted reward-description");
             var count=Element(content,"row count-control");Text(count,"Боты","setting-label");
             Button(count,"−",()=>{game.BotCount--;game.ConfigureBots();},"count-button").SetEnabled(game.BotCount>1);
             Text(count,game.BotCount.ToString(),"timer");Button(count,"+",()=>{game.BotCount++;game.ConfigureBots();},"count-button").SetEnabled(game.BotCount<4);
             var difficulty=new DropdownField("Сложность",new List<string>(BotMatchController.DifficultyNames),(int)game.BotLevel);difficulty.AddToClassList("wide-field");difficulty.name="bot-difficulty";content.Add(difficulty);
             difficulty.RegisterValueChangedCallback(_=>{game.BotLevel=(BotDifficulty)difficulty.index;game.ConfigureBots();});
-            Text(content,"Доход ботов: легко 1,4/с · обычно 2/с · сложно 2,6/с. Боты тратят эссенцию в магазине.","small muted");
+            Text(content,"Доход ботов: легко 1,4/с · обычно 2/с · сложно 2,6/с. Боты тоже получают по одному навыку за предложение.","small muted");
             var preview=Element(content,"conditions");Text(preview,$"300 HP каждому · арена {8+2*(game.BotCount-1)} · ×1","condition-title");
             for(int i=0;i<game.BotOffer.Count;i++)Text(preview,$"#{i+1} {game.weapons[game.BotOffer.weapons[i]].displayName}"+(i==0?" · ты":""),"bot-preview-line").style.color=game.ParticipantColor(i)*new Color(.75f,.75f,.75f,1);
             Button(content,"Другой состав",()=>game.ConfigureBots(true),"secondary").name="reroll-bots";
@@ -57,6 +68,7 @@ namespace ArmOrb
             for(int i=0;i<game.CurrentFight.Count;i++)
             {
                 var cell=Element(participants,"fight-participant");cell.style.borderLeftColor=game.ParticipantColor(i);
+                if(i==0)cell.AddToClassList("focus-participant");
                 var row=Element(cell,"row");Text(row,$"#{i+1} {game.weapons[game.CurrentFight.weapons[i]].displayName}"+(i==0?" · ты":""),"fighter-label");
                 hp.Add(Text(row,"","fight-hp"));var fill=Element(Element(cell,"reload-track"),"reload-fill");fill.style.backgroundColor=game.ParticipantColor(i);reload.Add(fill);
             }
@@ -64,62 +76,69 @@ namespace ArmOrb
             var field=new Image{image=game.ArenaTexture,scaleMode=ScaleMode.StretchToFill,pickingMode=PickingMode.Ignore,name="arena"};field.AddToClassList("arena");holder.Add(field);
             app.RegisterCallback<GeometryChangedEvent>(e=>{float h=Mathf.Min(e.newRect.width,e.newRect.height*.47f);if(Mathf.Abs(holder.resolvedStyle.height-h)>1)holder.style.height=h;});
             holder.RegisterCallback<GeometryChangedEvent>(e=>{float size=Mathf.Max(1,Mathf.Min(e.newRect.width,e.newRect.height));field.style.width=size;field.style.height=size;});
-            var resource=Element(app,"row essence-row");essenceLabel=Text(resource,"","essence");shopCountdown=Text(resource,"","small");
+            var resource=Element(app,"row essence-row");essenceLabel=Text(resource,"","essence");skillStatus=Text(resource,"","small");
+            gaugeTrack=Element(app,"gauge-track");gaugeFill=Element(gaugeTrack,"gauge-fill");
+            gaugeTrack.style.display=game.BotMatch.Data.rewardMode==RewardMode.Gauge?DisplayStyle.Flex:DisplayStyle.None;
             danger=Text(app,"","danger-label");danger.style.display=DisplayStyle.None;
             for(int i=0;i<game.CurrentFight.Count;i++)
             {
                 var label=Text(app,"","fighter-stat");if(i>0)label.style.display=DisplayStyle.None;stats.Add(label);
             }
-            var panel=Element(app,"mini-panel");var title=Element(panel,"row");
+            skillNotice=Text(app,"","skill-notice");
+            var panel=Element(app,"mini-panel");taskArea=Element(panel,"task-area");var title=Element(taskArea,"row");
             string[] instructions={"Повтори знак в правом поле","Соедини от трёх одинаковых","Нажми в зелёной области"};
             Text(title,BotMatchController.MiniNames[(int)game.BotMatch.Data.miniGame],"mini-title");
-            if(game.BotMatch.Data.miniGame==MiniGameKind.Drawing)Button(title,"Другой знак",()=>{if(!game.IsPaused){CancelMiniGesture();game.BotMatch.MiniGame.SkipDrawing();}},"text-button");
-            Text(panel,instructions[(int)game.BotMatch.Data.miniGame],"small muted");
-            miniView=new MiniGameView(game.BotMatch.MiniGame,()=>game.IsInFight&&!game.IsPaused&&game.BotMatch.Active,game.EarnEssence);panel.Add(miniView);
-            miniFeedback=Text(panel,"","mini-feedback");RefreshFight();
+            if(game.BotMatch.Data.miniGame==MiniGameKind.Drawing)Button(title,"Другой знак",()=>{if(!game.IsPaused&&game.BotMatch.TasksReady){CancelMiniGesture();game.BotMatch.MiniGame.SkipDrawing();}},"text-button");
+            Text(taskArea,instructions[(int)game.BotMatch.Data.miniGame],"small muted");
+            miniView=new MiniGameView(game.BotMatch.MiniGame,()=>game.IsInFight&&!game.IsPaused&&game.BotMatch.TasksReady,game.EarnEssence);taskArea.Add(miniView);
+            miniFeedback=Text(taskArea,"","mini-feedback");
+            restArea=Element(panel,"rest-area");restArea.name="task-rest";restFeedback=Text(restArea,"","rest-feedback");restCountdown=Text(restArea,"","rest-countdown");
+            choiceArea=Element(panel,"choice-area");choiceCountdown=Text(choiceArea,"","choice-countdown");choiceCountdown.name="skill-countdown";
+            choiceRow=Element(choiceArea,"row choice-row");visibleOfferId=-1;RefreshFight();
+        }
+        void BuildSkillCards()
+        {
+            choiceRow.Clear();skillButtons.Clear();autoLabels.Clear();targetLabels.Clear();
+            var match=game.BotMatch;var offer=match.Data.offers[0];visibleOfferId=offer.id;
+            for(int i=0;i<offer.cards.Length;i++)
+            {
+                int slot=i;var skill=offer.cards[i];
+                var button=Button(choiceRow,"",()=>game.ChooseBotSkill(slot),"skill-card");button.name="skill-card-"+i;skillButtons.Add(button);
+                var content=Element(button,"skill-content");content.pickingMode=PickingMode.Ignore;
+                Text(content,BotMatchController.Title(skill.kind),"skill-title");
+                Text(content,BotMatchController.Description(skill.kind,match.Simulation.Orbs[0].Weapon.Kind),"skill-description");
+                var target=Text(content,"","skill-target");targetLabels.Add(target);
+                if(skill.target>=0)target.style.color=game.ParticipantColor(skill.target)*new Color(.65f,.65f,.65f,1);
+                Text(content,match.Data.rewardMode==RewardMode.Timed?$"{BotMatchController.Cost(skill.kind)} эсс.":"", "skill-price");
+                autoLabels.Add(Text(content,"","skill-auto"));
+                foreach(var child in content.Query<Label>().ToList())child.pickingMode=PickingMode.Ignore;
+            }
         }
         void RefreshMiniGame()
         {
-            if(!game.IsBotFight||miniView==null)return;
-            miniView.Refresh();essenceLabel.text=$"Эссенция: {game.BotMatch.Balance}";
-            shopCountdown.text=game.BotMatch.Data.visit<4?$"Магазин через {Mathf.Max(0,Mathf.CeilToInt(game.BotMatch.NextShop-game.Simulation.Elapsed))} с":game.Simulation.Elapsed<90?"Последний этап":"Опасная зона";
-            miniFeedback.text=game.BotMatch.MiniGame.Feedback;
-            if(game.BotMatch.Data.miniGame==MiniGameKind.Drawing&&string.IsNullOrEmpty(miniFeedback.text))miniFeedback.text=MiniGameModel.DrawingNames[game.BotMatch.Data.puzzle.drawingTarget];
-        }
-        public void ShowBotShop()
-        {
-            CancelMiniGesture();RefreshFight();
-            var match=game.BotMatch;
-            var card=Dialog($"Магазин · {match.Data.visit}/4",$"Эссенция: {match.Balance} · бой на паузе");
-            var scroll=new ScrollView();scroll.AddToClassList("shop-scroll");scroll.style.maxHeight=Mathf.Max(200,root.resolvedStyle.height*.54f);card.Add(scroll);
-            for(int i=0;i<match.Data.cards.Length;i++)
+            if(!game.IsBotFight||taskArea==null)return;
+            var match=game.BotMatch;bool choosing=match.Data.offers[0].open;bool resting=!choosing&&!match.MiniGame.Ready;
+            taskArea.style.display=choosing||resting?DisplayStyle.None:DisplayStyle.Flex;
+            restArea.style.display=resting?DisplayStyle.Flex:DisplayStyle.None;
+            choiceArea.style.display=choosing?DisplayStyle.Flex:DisplayStyle.None;
+            miniView.Refresh();
+            essenceLabel.text=match.Data.rewardMode==RewardMode.Gauge?$"Эссенция: {match.Balance}/60":$"Эссенция: {match.Balance}";
+            gaugeFill.style.width=Length.Percent(100*Mathf.Clamp01(match.Balance/(float)BotMatchController.GaugeCost));
+            skillStatus.text=choosing?"Выбор навыка":match.Data.rewardMode==RewardMode.Timed?$"Выбор через {Mathf.Max(0,Mathf.CeilToInt(match.NextOfferSeconds-game.Simulation.Elapsed))} с":"Навык за 60 эссенции";
+            skillNotice.text=match.Notice;
+            restFeedback.text=match.MiniGame.Feedback;restCountdown.text=$"Следующее задание через {Mathf.CeilToInt(match.Data.puzzle.restRemaining)} с";
+            miniFeedback.text=match.MiniGame.Feedback;
+            if(match.Data.miniGame==MiniGameKind.Drawing&&string.IsNullOrEmpty(miniFeedback.text))miniFeedback.text=MiniGameModel.DrawingNames[match.Data.puzzle.drawingTarget];
+            if(!choosing)return;
+            if(visibleOfferId!=match.Data.offers[0].id)BuildSkillCards();
+            choiceCountdown.text=$"Выбери навык · {Mathf.CeilToInt(match.ChoiceRemaining)} с";
+            int automatic=match.AutoChoice();
+            for(int i=0;i<skillButtons.Count;i++)
             {
-                int slot=i;var item=match.Data.cards[i];var box=Element(scroll,"shop-item");
-                Text(box,$"{BotMatchController.Title(item.kind)} · {BotMatchController.Cost(item.kind)}","condition-title");
-                Text(box,BotMatchController.Description(item.kind,match.Simulation.Orbs[0].Weapon.Kind),"small");
-                int target=-1;
-                if((int)item.kind>=(int)UpgradeKind.Vulnerability)
-                {
-                    var ids=new List<int>();var names=new List<string>();
-                    for(int id=1;id<match.Simulation.Orbs.Length;id++)if(!match.Simulation.Orbs[id].Health.IsDead){ids.Add(id);names.Add($"#{id+1} {game.weapons[game.CurrentFight.weapons[id]].displayName} · {Mathf.CeilToInt(match.Simulation.Orbs[id].Health.Current)} HP");}
-                    if(ids.Count>0)
-                    {
-                        target=ids[0];var select=new DropdownField(names,0);select.AddToClassList("wide-field");select.name="shop-target-"+slot;box.Add(select);
-                        select.RegisterValueChangedCallback(_=>target=ids[select.index]);
-                    }
-                }
-                var buy=Button(box,item.sold?"Куплено":"Купить",()=>game.BuyBotUpgrade(slot,target),"shop-buy");buy.name="shop-buy-"+slot;
-                buy.SetEnabled(!item.sold&&match.Balance>=BotMatchController.Cost(item.kind)&&match.Simulation.CanUpgrade(0,item.kind,target));
+                var skill=match.Data.offers[0].cards[i];skillButtons[i].SetEnabled(!game.IsPaused&&match.CanChoose(0,i));
+                autoLabels[i].text=i==automatic?"Автовыбор":"";skillButtons[i].EnableInClassList("auto-skill",i==automatic);
+                targetLabels[i].text=skill.target<0?"Твой шар":$"#{skill.target+1} {game.weapons[game.CurrentFight.weapons[skill.target]].displayName}"+(match.Simulation.Orbs[skill.target].Health.IsDead?" · выбыл":"");
             }
-            Button(card,"Продолжить бой",game.ContinueBotShop,"primary").name="continue-bot-shop";
-            Button(card,"Сохранить и выйти",game.BackToSetup,"text-button");
-        }
-        public void ShowBotPurchases()
-        {
-            var card=Dialog("Покупки",$"Осталось эссенции: {game.BotMatch.Balance}");
-            var scroll=new ScrollView();scroll.style.maxHeight=Mathf.Max(180,root.resolvedStyle.height*.48f);card.Add(scroll);
-            Text(scroll,string.IsNullOrEmpty(game.BotMatch.Data.purchases)?"В этот раз никто ничего не купил.":game.BotMatch.Data.purchases.TrimEnd(),"rule");
-            Button(card,"Продолжить",game.TogglePause,"primary").name="resume-bot-purchases";
         }
         public void ShowBotResult()
         {

@@ -138,3 +138,26 @@ Button:focus { border-color: #111111; }
 .shop-item { border-width: 1px; border-color: #d5d5d0; padding: 12px; margin-bottom: 10px; }
 .shop-item .wide-field { margin-top: 8px; font-size: 18px; }
 .shop-buy { margin-top: 10px; min-height: 48px; }
+/* v0.7 */
+.reward-options { margin-top: 16px; }
+.reward-segment { width: 49%; font-size: 19px; }
+.reward-description { margin-top: 8px; margin-bottom: 16px; }
+.focus-participant { border-top-width: 3px; border-top-color: #2f6bff; }
+.gauge-track { height: 4px; flex-shrink: 0; background-color: #ddddda; }
+.gauge-fill { height: 4px; background-color: #7350b1; }
+.skill-notice { min-height: 24px; font-size: 16px; color: #555555; flex-shrink: 0; }
+.task-area, .choice-area { flex-grow: 1; }
+.rest-area { flex-grow: 1; align-items: center; justify-content: center; }
+.rest-feedback { font-size: 19px; color: #777777; margin-bottom: 16px; }
+.rest-countdown { font-size: 24px; color: #555555; -unity-text-align: middle-center; }
+.choice-countdown { font-size: 24px; -unity-font-style: bold; margin-bottom: 12px; flex-shrink: 0; }
+.choice-row { flex-grow: 1; align-items: stretch; }
+.skill-card { width: 32%; min-height: 210px; padding: 12px 8px; background-color: #fafaf8; border-color: #cccccc; align-items: stretch; }
+.skill-card.auto-skill { border-color: #2f6bff; border-width: 2px; }
+.skill-content { flex-grow: 1; align-items: stretch; }
+.skill-title { font-size: 21px; -unity-font-style: bold; margin-bottom: 12px; }
+.skill-description { font-size: 17px; flex-grow: 1; }
+.skill-target { font-size: 17px; margin-top: 12px; min-height: 44px; }
+.skill-price { font-size: 21px; -unity-font-style: bold; min-height: 28px; }
+.skill-auto { font-size: 16px; min-height: 23px; color: #2f6bff; }
+.bot-fight .mini-panel { min-height: 320px; }
