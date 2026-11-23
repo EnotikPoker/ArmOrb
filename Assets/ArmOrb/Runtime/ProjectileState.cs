@@ -4,11 +4,13 @@ namespace ArmOrb
 {
     public sealed class ProjectileState
     {
-        public int Id, Owner, Bounces, Reflections;
+        public int Id, Owner, Bounces, Reflections, PierceRemaining, HitMask, WallBounces;
         public WeaponKind Kind;
         public Vector2 Position, PreviousPosition, Velocity;
         public float Damage, Radius, HalfShaft, BlastRadius, WaveSpeed, Age;
-        public bool Active;
+        public bool Active, Special, Reflected;
+        public float OriginalDamage, BounceBaseDamage;
+        public BuildAttackSnapshot BuildAttack;
     }
 
     public sealed class WaveState
@@ -16,7 +18,9 @@ namespace ArmOrb
         public int Id, Owner;
         public Vector2 Position;
         public float Radius, PreviousRadius, MaximumRadius, Speed, Damage;
-        public bool Hit, Active;
+        public bool Hit, Active, Extra, Reflected;
+        public float OriginalDamage;
+        public BuildAttackSnapshot BuildAttack;
         public int HitMask;
     }
 

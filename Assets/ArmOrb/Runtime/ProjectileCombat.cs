@@ -28,7 +28,9 @@ namespace ArmOrb
                 Vector2 limit = Vector2.one*(Size*0.5f-p.Radius)-new Vector2(Mathf.Abs(direction.x),Mathf.Abs(direction.y))*p.HalfShaft;
                 Vector2 muzzle = orb.Position + direction * (Radius + p.Radius + 0.04f);
                 p.Position = p.PreviousPosition = new Vector2(Mathf.Clamp(muzzle.x, -limit.x, limit.x), Mathf.Clamp(muzzle.y, -limit.y, limit.y));
-                p.Velocity = direction * weapon.ProjectileSpeed; p.Damage = weapon.Damage;
+                p.Velocity = direction * weapon.ProjectileSpeed; p.OriginalDamage = weapon.Damage; p.Damage = CaptureBuildDamage(side,weapon.Damage);
+                p.PierceRemaining=BuildRules&&Builds[side].Has(BuildSkill.CrossbowPierce)?1:0;p.HitMask=0;p.WallBounces=0;p.Reflected=false;
+                p.Special=BuildRules&&Builds[side].Has(BuildSkills.Special(weapon.Kind));p.BounceBaseDamage=p.Damage;p.BuildAttack=BuildRules?CaptureBuildAttack(side):default;
                 p.Bounces = weapon.Bounces; p.BlastRadius = weapon.BlastRadius; p.WaveSpeed = weapon.WaveSpeed;
                 p.Age = 0; p.Reflections = 0; p.Active = true; projectiles.Add(p);
             }
@@ -36,6 +38,13 @@ namespace ArmOrb
         }
         void Explode(ProjectileState p)
         {
+            if(BuildRules)
+            {
+                AddBuildWave(p.Owner,p.Position,p.BlastRadius,p.WaveSpeed,p.Damage,p.OriginalDamage,false,p.BuildAttack);
+                waves[waves.Count-1].Reflected=p.Reflected;
+                if(p.Special&&p.Kind==WeaponKind.Staff&&!p.Reflected)echoes.Add(new Echo{Time=.4f,Owner=p.Owner,Position=p.Position,Radius=p.BlastRadius,Speed=p.WaveSpeed,Damage=p.Damage*.6f,Original=p.OriginalDamage*.6f,Attack=p.BuildAttack});
+                return;
+            }
             var w = freeWaves.Count > 0 ? freeWaves.Pop() : new WaveState();
             w.Id = ++nextEffectId; w.Owner = p.Owner; w.Position = p.Position;
             w.Radius = w.PreviousRadius = 0; w.MaximumRadius = p.BlastRadius;
@@ -58,7 +67,7 @@ namespace ArmOrb
                     float tx = WallTime(from.x, to.x, limit.x), ty = WallTime(from.y, to.y, limit.y);
                     float wall = Mathf.Min(tx, ty), body = float.PositiveInfinity, shield = float.PositiveInfinity;
                     int bodyTarget=-1,shieldTarget=-1;
-                    for(int target=0;target<Orbs.Length;target++) if(target!=p.Owner && alive[target])
+                    for(int target=0;target<Orbs.Length;target++) if(target!=p.Owner && alive[target] && (!BuildRules || (p.HitMask&(1<<target))==0))
                     {
                         Vector2 bodyFrom = Vector2.Lerp(start[target], end[target], offset / dt);
                         float candidate = ProjectileCollision.Body(bodyFrom-from,end[target]-to,direction,p.HalfShaft,Radius+p.Radius);
@@ -81,7 +90,7 @@ namespace ArmOrb
                         Vector2 away = OrbMotion.Direction(p.Position-defender.Position,normal);
                         Vector2 outgoing = Vector2.Reflect(p.Velocity,normal);
                         if(Vector2.Dot(outgoing,away)<0) outgoing=Vector2.Reflect(p.Velocity,away);
-                        p.Velocity=outgoing; p.Owner=target; p.Reflections++;
+                        p.Velocity=outgoing; p.Owner=target; p.Reflections++;if(BuildRules){p.Reflected=true;p.HitMask=0;}
                         p.Position+=OrbMotion.Direction(outgoing,away)*0.0001f;
                         Emit(CombatEventKind.Block,p.Position,target);MarkContact(target,p.Owner);
                         offset+=remaining*impact; remaining*=1-impact;
@@ -90,12 +99,16 @@ namespace ArmOrb
                     else if (body <= wall)
                     {
                         if (p.Kind == WeaponKind.Staff) Explode(p);
+                        else if(BuildRules)DealBuildDamage(p.Owner,bodyTarget,p.Damage,p.Reflected?BuildDamageKind.Reflected:BuildDamageKind.Direct,true,p.OriginalDamage,p.BuildAttack);
                         else DamageHit(p.Owner, bodyTarget, p.Damage, p.Position);
+                        if(BuildRules&&p.Kind==WeaponKind.Crossbow&&p.PierceRemaining>0)
+                        {p.PierceRemaining--;p.HitMask|=1<<bodyTarget;p.Position+=direction*.0001f;offset+=remaining*impact;remaining*=1-impact;continue;}
                         p.Active = false;
                     }
                     else if (p.Kind == WeaponKind.Shuriken && p.Bounces > 0)
                     {
                         p.Bounces--;
+                        if(BuildRules&&p.Special){p.WallBounces++;p.Damage=p.BounceBaseDamage*(1+Mathf.Min(1.5f,p.WallBounces*.25f));}
                         if (Mathf.Abs(tx - wall) < 0.00001f) p.Velocity.x *= -1;
                         if (Mathf.Abs(ty - wall) < 0.00001f) p.Velocity.y *= -1;
                         // Move a tiny distance into the arena to avoid a zero-time wall repeat.
@@ -115,7 +128,7 @@ namespace ArmOrb
                 w.Radius = Mathf.Min(w.MaximumRadius, w.Radius + w.Speed * dt);
                 for(int target=0;target<Orbs.Length;target++) if(target!=w.Owner && alive[target] && (w.HitMask&(1<<target))==0 &&
                     ProjectileCollision.Ring(start[target]-w.Position,end[target]-w.Position,beforeRadius,w.Radius,Radius))
-                { w.Hit=true;w.HitMask|=1<<target;DamageHit(w.Owner,target,w.Damage,Orbs[target].Position); }
+                { w.Hit=true;w.HitMask|=1<<target;if(BuildRules)DealBuildDamage(w.Owner,target,w.Damage,w.Reflected?BuildDamageKind.Reflected:w.Extra?BuildDamageKind.Extra:BuildDamageKind.Direct,true,w.OriginalDamage,w.BuildAttack);else DamageHit(w.Owner,target,w.Damage,Orbs[target].Position); }
                 if (w.Radius >= w.MaximumRadius) w.Active = false;
             }
             for (int n = waves.Count - 1; n >= 0; n--)
@@ -135,7 +148,7 @@ namespace ArmOrb
                 {
                     if(weapon.Kind==WeaponKind.Bow)
                     {
-                        weapon.BurstRemaining=weapon.ArrowCount;
+                        weapon.BurstRemaining=weapon.ArrowCount*(BuildRules&&Builds[side].Has(BuildSkill.BowDouble)?2:1);
                         weapon.BurstDelay=0;ReleaseBowArrow(side);
                     }
                     else { Fire(side); weapon.ReloadRemaining+=weapon.Cooldown; }
@@ -157,6 +170,7 @@ namespace ArmOrb
         }
         void DamageHit(int attacker, int targetId, float damage, Vector2 position)
         {
+            if(BuildRules){DealBuildDamage(attacker,targetId,damage);return;}
             var orb=Orbs[attacker];var target=Orbs[targetId];float before=target.Health.Current;
             target.Health.Damage(damage);
             if(target.Health.Current<before)

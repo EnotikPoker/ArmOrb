@@ -51,17 +51,21 @@ namespace ArmOrb
         }
         public void Show(CombatEvent e, Color tint)
         {
-            if (e.Kind == CombatEventKind.Finished || e.Kind == CombatEventKind.Shot || e.Kind == CombatEventKind.Explosion) return;
+            if (e.Kind == CombatEventKind.Finished || e.Kind == CombatEventKind.Shot || e.Kind == CombatEventKind.Explosion || e.Kind == CombatEventKind.Upgrade) return;
             bool impact = e.Kind == CombatEventKind.Hit || e.Kind == CombatEventKind.Poison || e.Kind == CombatEventKind.Block;
-            if (impact || e.Kind == CombatEventKind.Clash)
+            bool support=e.Kind is CombatEventKind.Healing or CombatEventKind.Barrier or CombatEventKind.Revive;
+            bool special=e.Kind is CombatEventKind.Critical or CombatEventKind.Burning;
+            if (impact || support || special || e.Kind == CombatEventKind.Clash)
             {
                 var p = pool[next++ % pool.Length];
                 p.Root.SetActive(true); p.Time = 0.6f; p.Origin = e.Position;
-                p.Color = e.Kind == CombatEventKind.Poison ? new Color(0.45f, 0.62f, 0.22f) : tint;
-                p.Label.text = e.Amount > 0 ? "−" + e.Amount.ToString("0.#") : "";
+                p.Color = e.Kind switch { CombatEventKind.Poison=>new Color(.45f,.62f,.22f),
+                    CombatEventKind.Healing or CombatEventKind.Revive=>new Color(.1f,.65f,.35f),
+                    CombatEventKind.Barrier=>new Color(.2f,.5f,1),CombatEventKind.Critical or CombatEventKind.Burning=>new Color(1,.5f,.1f),_=>tint };
+                p.Label.text=e.Kind==CombatEventKind.Critical?"КРИТ":e.Kind==CombatEventKind.Revive?"ВОЗВРАТ":e.Kind==CombatEventKind.Burning?"ОЖОГ":e.Amount>0?(support?"+":"−")+e.Amount.ToString("0.#"):"";
                 p.Label.color = p.Color;
             }
-            if (!Muted && Time.unscaledTime - lastSound > 0.04f)
+            if (!Muted && !support && !special && Time.unscaledTime - lastSound > 0.04f)
             {
                 lastSound = Time.unscaledTime;
                 audioSource.PlayOneShot(impact ? hitSound : e.Kind == CombatEventKind.Clash ? clashSound : bounceSound,
