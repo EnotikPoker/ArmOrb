@@ -30,7 +30,7 @@ namespace ArmOrb
         static void Classes(VisualElement e,string classes){if(classes!=null)foreach(string c in classes.Split(' '))e.AddToClassList(c);}
         static void Selected(VisualElement e,bool selected)=>e.EnableInClassList("selected",selected);
         void NewPage()
-        {CancelMiniGesture();miniView=null;essenceLabel=null;miniFeedback=null;root.Clear();overlay=null;calculation=null;speeds.Clear();app=Element(root,"app");previousSize=Vector2Int.zero;UpdateSafeArea();}
+        {CancelMiniGesture();miniView=null;essenceLabel=null;miniFeedback=null;taskArea=null;root.Clear();overlay=null;calculation=null;speeds.Clear();app=Element(root,"app");previousSize=Vector2Int.zero;UpdateSafeArea();}
         public void ShowSetup()=>ShowHome();
         public void ShowHome()
         {
@@ -45,7 +45,7 @@ namespace ArmOrb
             if(!string.IsNullOrEmpty(game.Error))Text(content,game.Error,"error");
             if(!string.IsNullOrEmpty(game.Wallet.RecoveryMessage))Text(content,game.Wallet.RecoveryMessage,"small muted");
             if(game.ShowTest)TestSetup(content);else if(game.Mode==GameMode.Bots)BotSetup(content);else BetSetup(content);
-            var footer=Element(app,"row footer");Button(footer,"Правила · v0.6",ShowRules,"text-button");sound=Button(footer,"",game.ToggleSound,"text-button");RefreshSound();
+            var footer=Element(app,"row footer");Button(footer,"Правила · v0.7",ShowRules,"text-button");sound=Button(footer,"",game.ToggleSound,"text-button");RefreshSound();
         }
         void TestSetup(VisualElement content)
         {
@@ -158,6 +158,7 @@ namespace ArmOrb
             for(int i=0;i<game.CurrentFight.Count;i++)
             {
                 var cell=Element(participants,"fight-participant");cell.style.borderLeftColor=game.ParticipantColor(i);
+                if(OrbView.IsFocus(false,game.IsBetFight,game.LastBetSelection,i))cell.AddToClassList("focus-participant");
                 var row=Element(cell,"row");Text(row,$"#{i+1} {game.weapons[game.CurrentFight.weapons[i]].displayName}"+(game.IsBetFight&&game.LastBetSelection==i?" ★":""),"fighter-label");hp.Add(Text(row,"","fight-hp"));
                 var track=Element(cell,"reload-track");var fill=Element(track,"reload-fill");fill.style.backgroundColor=game.ParticipantColor(i);reload.Add(fill);
             }
@@ -221,7 +222,7 @@ namespace ArmOrb
                 "Лук выпускает очередь с интервалом 0,06 с, арбалет — одновременный веер. Попадание добавляет стрелу следующему выстрелу. Перезарядка 1 с; у сюрикена 0,8 с.",
                 "Посох: огненный шар каждую секунду; волна наносит 3 урона каждому врагу один раз. Радиус растёт на 0,35 за попадание. Сюрикен: +1 отскок за попадание.",
                 "Выбывшие больше не атакуют; уже выпущенные снаряды и наложенный яд остаются. Собственные снаряды не опасны. Усиления сбрасываются между боями.",
-                "Битва с ботами: 1–4 противника, 300 HP. Внизу — знаки, плитки или ритм для заработка эссенции. На 20/40/60/80 с магазин; с 90 с сужение. Эссенция и покупки действуют только в этом матче.",
+                "Битва с ботами: 1–4 противника, 300 HP. После успешного задания перерыв 3 с. Выбор одного из трёх навыков длится 7 с и не останавливает бой; первый доступный применяется автоматически. Развитие по шкале 60 эссенции либо покупки каждые 30 с. С 90 с сужение. Эссенция и навыки действуют только в этом матче.",
                 "При балансе меньше 10 монет и отсутствии незавершённой ставки можно бесплатно восстановить баланс до 1000."};
             foreach(string rule in rules)Text(scroll,rule,"rule");Button(card,"Закрыть",CloseOverlay,"primary");
         }

@@ -8,7 +8,8 @@ namespace ArmOrb
     public enum GameMode { Bets, Test, Bots }
     public enum MiniGameKind { Drawing, Tiles, Rhythm }
     public enum BotDifficulty { Easy, Normal, Hard }
-    public enum BotPhase { Combat, Shop, Finished }
+    public enum BotPhase { Combat, Choice, Finished }
+    public enum RewardMode { Gauge, Timed }
 
     // Independent reproducible random streams; no UnityEngine.Random or worker asset access.
     public static class MatchRandom
@@ -19,32 +20,66 @@ namespace ArmOrb
     }
     [Serializable] public sealed class UpgradeCommand
     { public int tick, actor, target; public UpgradeKind kind; }
-    [Serializable] public sealed class ShopCard
-    { public UpgradeKind kind; public bool sold; }
+    [Serializable] public sealed class SkillCard
+    { public UpgradeKind kind; public int target = -1; }
+    [Serializable] public sealed class SkillOffer
+    {
+        public bool open;
+        public int id, deadlineTick, actionTick;
+        public SkillCard[] cards = Array.Empty<SkillCard>();
+    }
     [Serializable] public sealed class BotMatchSave
     {
-        public int version = 1;
-        public string rules = "0.6";
+        public int version = 2;
+        public string rules = "0.7";
         public FightDefinition fight;
         public MiniGameKind miniGame;
         public BotDifficulty difficulty;
-        public int ticks, visit, outcome;
+        public RewardMode rewardMode;
+        public int frequency = 120, ticks, visit, outcome, nextTimedTick, sequence;
         public BotPhase phase;
         public uint random;
         public double[] essence;
+        public int[] incomeRemainder;
         public MiniGameData puzzle;
-        public ShopCard[] cards = Array.Empty<ShopCard>();
+        public SkillOffer[] offers;
         public List<UpgradeCommand> commands = new List<UpgradeCommand>();
-        public string purchases = "";
+        public string notice = "";
+        public int noticeTick;
+
+        public static void Migrate(BotMatchSave data)
+        {
+            if (data.version != 1 || data.rules != "0.6") return;
+            data.version = 2; data.rules = "0.7"; data.rewardMode = RewardMode.Timed;
+            data.frequency = 120; data.phase = BotPhase.Combat;
+            data.nextTimedTick = (data.ticks / (30 * data.frequency) + 1) * 30 * data.frequency;
+            data.offers = NewOffers(data.fight.Count); data.puzzle.restRemaining = 0;
+            data.incomeRemainder = new int[data.fight.Count];
+            for(int i=0;i<data.essence.Length;i++)
+            {
+                double whole=Math.Floor(data.essence[i]+1e-7);
+                data.incomeRemainder[i]=Mathf.Clamp((int)Math.Round((data.essence[i]-whole)*data.frequency*10),0,data.frequency*10-1);
+                data.essence[i]=whole;
+            }
+        }
+        public static SkillOffer[] NewOffers(int count)
+        {
+            var offers = new SkillOffer[count]; for (int i = 0; i < count; i++) offers[i] = new SkillOffer(); return offers;
+        }
     }
     public sealed class BotMatchController
     {
+        public const int GaugeCost = 60;
         public BotMatchSave Data { get; }
         public ArenaSimulation Simulation { get; }
         public MiniGameModel MiniGame { get; }
-        public bool Active => Data.phase == BotPhase.Combat;
+        public bool Active => Data.phase != BotPhase.Finished;
+        public bool TasksReady => Active && !Data.offers[0].open && MiniGame.Ready;
         public int Balance => (int)Math.Floor(Data.essence[0] + 1e-7);
-        public int NextShop => (Data.visit + 1) * 20;
+        public int NextOfferSeconds => Data.nextTimedTick / Data.frequency;
+        public float ChoiceRemaining => Mathf.Max(0, (Data.offers[0].deadlineTick - Data.ticks) / (float)Data.frequency);
+        public string Notice => Data.ticks - Data.noticeTick < Data.frequency * 3 ? Data.notice : "";
+        public static readonly string[] RewardNames = { "По шкале", "Каждые 30 секунд" };
         public static readonly string[] MiniNames = { "Знаки", "Плитки", "Ритм" };
         public static readonly string[] DifficultyNames = { "Легко", "Обычно", "Сложно" };
         public static int Cost(UpgradeKind kind) => kind switch { UpgradeKind.Heal => 25, UpgradeKind.Armor => 35, UpgradeKind.Weapon => 40, _ => 30 };
@@ -71,12 +106,15 @@ namespace ArmOrb
             for (int i = 0; i <= bots; i++) { f.weapons[i] = i == 0 ? Mathf.Clamp(weapon, 0, 9) : random.Next(10); f.health[i] = 300; }
             return f;
         }
-        public BotMatchController(SimulationFactory factory, FightDefinition fight, MiniGameKind mini, BotDifficulty difficulty)
-            : this(factory, new BotMatchSave { fight = fight.Copy(), miniGame = mini, difficulty = difficulty,
-                random = (uint)fight.seed ^ 0xa341316c, essence = new double[fight.Count], puzzle = new MiniGameData { random = (uint)fight.seed ^ 0xc8013ea4 } }, false) { }
+        public BotMatchController(SimulationFactory factory, FightDefinition fight, MiniGameKind mini, BotDifficulty difficulty, RewardMode mode = RewardMode.Gauge)
+            : this(factory, new BotMatchSave { fight = fight.Copy(), miniGame = mini, difficulty = difficulty, rewardMode = mode,
+                frequency = factory.Frequency, nextTimedTick = factory.Frequency * 30, offers = BotMatchSave.NewOffers(fight.Count),
+                random = (uint)fight.seed ^ 0xa341316c, essence = new double[fight.Count], incomeRemainder = new int[fight.Count], puzzle = new MiniGameData { random = (uint)fight.seed ^ 0xc8013ea4 } }, false) { }
         public BotMatchController(SimulationFactory factory, BotMatchSave save) : this(factory, save, true) { }
         BotMatchController(SimulationFactory factory, BotMatchSave save, bool restore)
         {
+            BotMatchSave.Migrate(save);
+            if (save.frequency != factory.Frequency) throw new InvalidDataException("Battle frequency changed");
             Data = save; Simulation = factory.Create(save.fight);
             if (restore)
             {
@@ -100,44 +138,119 @@ namespace ArmOrb
         {
             if (!Active) return;
             Simulation.Step(dt); Data.ticks = Simulation.TickCount;
-            MiniGame.Tick(dt);
-            double income = Data.difficulty switch { BotDifficulty.Easy => 1.4, BotDifficulty.Hard => 2.6, _ => 2.0 };
-            for (int i = 1; i < Data.essence.Length; i++) if (!Simulation.Orbs[i].Health.IsDead) Data.essence[i] += income * dt;
             if (Simulation.Result != MatchResult.InProgress || Simulation.Orbs[0].Health.IsDead)
             {
                 Data.outcome = Simulation.Result == MatchResult.Draw ? 2 : Simulation.WinnerIndex == 0 ? 1 : 0;
-                Data.phase = BotPhase.Finished; return;
+                Data.phase = BotPhase.Finished;
+                foreach (var offer in Data.offers) offer.open = false;
+                return;
             }
-            if (Data.visit < 4 && Simulation.Elapsed >= NextShop)
-            { Data.visit++; Data.phase = BotPhase.Shop; BuildShop(); }
+            if (!Data.offers[0].open) MiniGame.Tick(dt);
+            // Integer subunits avoid balance drift over JSON round trips; one tick is 1/frequency seconds.
+            int income = Data.difficulty switch { BotDifficulty.Easy => 14, BotDifficulty.Hard => 26, _ => 20 };
+            int denominator = Data.frequency * 10;
+            for (int i = 1; i < Data.essence.Length; i++) if (!Simulation.Orbs[i].Health.IsDead)
+            {
+                Data.incomeRemainder[i] += income;
+                Data.essence[i] += Data.incomeRemainder[i] / denominator;
+                Data.incomeRemainder[i] %= denominator;
+            }
+            bool timedMoment = Data.ticks >= Data.nextTimedTick;
+            if (timedMoment) do { Data.nextTimedTick += 30 * Data.frequency; } while (Data.nextTimedTick <= Data.ticks);
+            if (Data.rewardMode == RewardMode.Timed && timedMoment)
+            {
+                for (int i = 0; i < Data.offers.Length; i++) OpenOffer(i);
+            }
+            else if (Data.rewardMode == RewardMode.Gauge)
+            {
+                // The player opens a gauge offer only after a new successful task, never a chain of queued windows.
+                for (int i = 1; i < Data.offers.Length; i++) if (Data.essence[i] + 1e-7 >= GaugeCost) OpenOffer(i);
+            }
+            for (int i = 0; i < Data.offers.Length; i++)
+            {
+                var offer = Data.offers[i]; if (!offer.open) continue;
+                if (Simulation.Orbs[i].Health.IsDead) { CloseOffer(i); continue; }
+                if (i == 0 && Data.ticks >= offer.deadlineTick) ResolveAutomatic(i);
+                else if (i > 0 && Data.ticks >= offer.actionTick) ResolveAutomatic(i);
+            }
         }
-        public void Earn(int reward) { if (Active && reward > 0 && reward <= 20) Data.essence[0] += reward; }
-        void BuildShop()
+        public void Earn(int reward)
         {
-            var available = new List<UpgradeKind>();
-            foreach (UpgradeKind kind in Enum.GetValues(typeof(UpgradeKind))) if (Simulation.CanUpgrade(0, kind, (int)kind >= (int)UpgradeKind.Vulnerability ? LivingTarget(0, false) : -1)) available.Add(kind);
-            var result = new List<ShopCard>();
-            foreach (var kind in available) if ((int)kind <= (int)UpgradeKind.Weapon) result.Add(new ShopCard { kind = kind });
-            var sabotage = available.FindAll(k => (int)k >= (int)UpgradeKind.Vulnerability);
-            if (sabotage.Count > 0) result.Add(new ShopCard { kind = sabotage[MatchRandom.Range(ref Data.random, sabotage.Count)] });
-            while (result.Count < 5 && available.Count > 0) result.Add(new ShopCard { kind = available[MatchRandom.Range(ref Data.random, available.Count)] });
-            for (int i = result.Count - 1; i > 0; i--) { int j = MatchRandom.Range(ref Data.random, i + 1); var temp = result[i]; result[i] = result[j]; result[j] = temp; }
-            Data.cards = result.ToArray(); Data.purchases = "";
+            if (!Active || Data.offers[0].open || reward <= 0 || reward > 20) return;
+            Data.essence[0] += reward;
+            if (Data.rewardMode == RewardMode.Gauge && Balance >= GaugeCost) OpenOffer(0);
         }
-        public bool Buy(int slot, int target = -1)
+        int Price(SkillCard card) => Data.rewardMode == RewardMode.Gauge ? GaugeCost : Cost(card.kind);
+        public bool CanChoose(int actor, int slot)
         {
-            if (Data.phase != BotPhase.Shop || slot < 0 || slot >= Data.cards.Length || Data.cards[slot].sold) return false;
-            var card = Data.cards[slot];
-            if (!Purchase(0, card.kind, target)) return false;
-            card.sold = true; return true;
+            if (!Active || actor < 0 || actor >= Data.offers.Length) return false;
+            var offer = Data.offers[actor];
+            return offer.open && slot >= 0 && slot < offer.cards.Length && Data.essence[actor] + 1e-7 >= Price(offer.cards[slot]) &&
+                Simulation.CanUpgrade(actor, offer.cards[slot].kind, offer.cards[slot].target);
         }
-        bool Purchase(int actor, UpgradeKind kind, int target)
+        public int AutoChoice(int actor = 0)
+        { for (int i = 0; i < Data.offers[actor].cards.Length; i++) if (CanChoose(actor, i)) return i; return -1; }
+        public bool Choose(int slot)
         {
-            int cost = Cost(kind);
-            if (Data.essence[actor] + 1e-7 < cost || !Simulation.ApplyUpgrade(actor, kind, target)) return false;
-            Data.essence[actor] -= cost;
-            Data.commands.Add(new UpgradeCommand { tick = Simulation.TickCount, actor = actor, target = target, kind = kind });
-            Data.purchases += $"#{actor + 1}: {Title(kind)}" + (target >= 0 ? $" → #{target + 1}" : "") + "\n";
+            if (Data.ticks >= Data.offers[0].deadlineTick) return false;
+            return Purchase(0, slot);
+        }
+        bool Purchase(int actor, int slot)
+        {
+            if (!CanChoose(actor, slot)) return false;
+            var card = Data.offers[actor].cards[slot];
+            if (!Simulation.ApplyUpgrade(actor, card.kind, card.target)) return false;
+            Data.essence[actor] -= Price(card);
+            Data.commands.Add(new UpgradeCommand { tick = Data.ticks, actor = actor, target = card.target, kind = card.kind });
+            Data.notice = (actor == 0 ? "Твой шар" : $"#{actor + 1}") + ": " + Title(card.kind) + (card.target >= 0 ? $" → #{card.target + 1}" : "");
+            Data.noticeTick = Data.ticks;
+            CloseOffer(actor); return true;
+        }
+        void CloseOffer(int actor)
+        {
+            Data.offers[actor].open = false;
+            if (actor == 0) { Data.phase = BotPhase.Combat; MiniGame.ResumeAfterChoice(); }
+        }
+        void ResolveAutomatic(int actor)
+        {
+            int slot = AutoChoice(actor);
+            if (actor > 0 && Data.difficulty == BotDifficulty.Easy)
+            {
+                var valid = new List<int>(); for (int i = 0; i < 3; i++) if (CanChoose(actor, i)) valid.Add(i);
+                if (valid.Count > 0) slot = valid[MatchRandom.Range(ref Data.random, valid.Count)];
+            }
+            else if (actor > 0 && Data.difficulty != BotDifficulty.Easy)
+            {
+                var priorities = Simulation.Orbs[actor].Health.Current < .4f * Simulation.Orbs[actor].Health.Maximum
+                    ? new[] { UpgradeKind.Heal, UpgradeKind.Weapon, UpgradeKind.Armor }
+                    : new[] { UpgradeKind.Weapon, UpgradeKind.Armor, UpgradeKind.Heal };
+                foreach (var kind in priorities)
+                {
+                    int preferred = Array.FindIndex(Data.offers[actor].cards, c => c.kind == kind);
+                    if (preferred >= 0 && CanChoose(actor, preferred)) { slot = preferred; break; }
+                }
+            }
+            if (slot < 0 || !Purchase(actor, slot)) CloseOffer(actor);
+        }
+        bool OpenOffer(int actor)
+        {
+            if (!Active || Data.offers[actor].open || Simulation.Orbs[actor].Health.IsDead) return false;
+            var candidates = new List<SkillCard>();
+            foreach (UpgradeKind kind in Enum.GetValues(typeof(UpgradeKind)))
+            {
+                int target = (int)kind >= 3 ? LivingTarget(actor, actor > 0 && Data.difficulty == BotDifficulty.Hard) : -1;
+                if (Simulation.CanUpgrade(actor, kind, target)) candidates.Add(new SkillCard { kind = kind, target = target });
+            }
+            var affordable = candidates.FindAll(c => Data.essence[actor] + 1e-7 >= Price(c));
+            if (affordable.Count == 0) return false;
+            for (int i = candidates.Count - 1; i > 0; i--) { int j = MatchRandom.Range(ref Data.random, i + 1); var temp = candidates[i]; candidates[i] = candidates[j]; candidates[j] = temp; }
+            var cards = new SkillCard[3]; for (int i = 0; i < 3; i++) { var c = candidates[i % candidates.Count]; cards[i] = new SkillCard { kind = c.kind, target = c.target }; }
+            if (!Array.Exists(cards, c => Data.essence[actor] + 1e-7 >= Price(c))) cards[0] = affordable[MatchRandom.Range(ref Data.random, affordable.Count)];
+            float delay = Data.difficulty switch { BotDifficulty.Easy => 4 + MatchRandom.Unit(ref Data.random) * 3,
+                BotDifficulty.Hard => 1 + MatchRandom.Unit(ref Data.random) * 2, _ => 2 + MatchRandom.Unit(ref Data.random) * 3 };
+            Data.offers[actor] = new SkillOffer { open = true, id = ++Data.sequence, cards = cards,
+                deadlineTick = Data.ticks + 7 * Data.frequency, actionTick = Data.ticks + Mathf.CeilToInt(delay * Data.frequency) };
+            if (actor == 0) { Data.phase = BotPhase.Choice; Data.visit++; }
             return true;
         }
         int LivingTarget(int actor, bool strongest)
@@ -146,33 +259,6 @@ namespace ArmOrb
             if (ids.Count == 0) return -1;
             if (!strongest) return ids[MatchRandom.Range(ref Data.random, ids.Count)];
             int best = ids[0]; foreach (int id in ids) if (Simulation.Orbs[id].Health.Current > Simulation.Orbs[best].Health.Current) best = id; return best;
-        }
-        public void Continue()
-        {
-            if (Data.phase != BotPhase.Shop) return;
-            for (int id = 1; id < Simulation.Orbs.Length; id++)
-            {
-                if (Simulation.Orbs[id].Health.IsDead) continue;
-                // Each bot has its own finite five-card shop, with the same prices and eligibility rules.
-                var stock = new List<UpgradeKind>();
-                for (int slot = 0; slot < 5; slot++) stock.Add((UpgradeKind)MatchRandom.Range(ref Data.random, 5));
-                if (Data.difficulty != BotDifficulty.Easy) { stock[0] = UpgradeKind.Heal; stock[1] = UpgradeKind.Weapon; stock[2] = UpgradeKind.Armor; }
-                for (int buy = 0; buy < 5; buy++)
-                {
-                    int target = LivingTarget(id, Data.difficulty == BotDifficulty.Hard);
-                    var valid = stock.FindAll(k => Cost(k) <= Data.essence[id] + 1e-7 && Simulation.CanUpgrade(id, k, (int)k >= (int)UpgradeKind.Vulnerability ? target : -1));
-                    if (valid.Count == 0) break;
-                    UpgradeKind choice = valid[MatchRandom.Range(ref Data.random, valid.Count)];
-                    if (Data.difficulty != BotDifficulty.Easy)
-                    {
-                        if (Simulation.Orbs[id].Health.Current < 0.4f * Simulation.Orbs[id].Health.Maximum && valid.Contains(UpgradeKind.Heal)) choice = UpgradeKind.Heal;
-                        else if (valid.Contains(UpgradeKind.Weapon)) choice = UpgradeKind.Weapon;
-                        else if (valid.Contains(UpgradeKind.Armor)) choice = UpgradeKind.Armor;
-                    }
-                    Purchase(id, choice, (int)choice >= (int)UpgradeKind.Vulnerability ? target : -1); stock.Remove(choice);
-                }
-            }
-            Data.phase = BotPhase.Combat; Data.cards = Array.Empty<ShopCard>();
         }
     }
     public sealed class BotMatchStore
@@ -192,11 +278,22 @@ namespace ArmOrb
             {
                 if (!File.Exists(file)) return null;
                 var d = JsonUtility.FromJson<BotMatchSave>(File.ReadAllText(file));
-                if (d == null || d.version != 1 || d.rules != "0.6" || d.fight == null || !d.fight.IsValid() || d.ticks < 0 || d.ticks > 20000 ||
-                    (int)d.phase < 0 || (int)d.phase >= (int)BotPhase.Finished || (int)d.miniGame < 0 || (int)d.miniGame > 2 || (int)d.difficulty < 0 || (int)d.difficulty > 2 ||
-                    d.visit < 0 || d.visit > 4 || d.essence == null || d.essence.Length != d.fight.Count || d.commands == null || d.commands.Count > 200 || d.puzzle == null || d.cards == null) return null;
+                if (d == null || d.fight == null || !d.fight.IsValid() || d.puzzle == null || d.essence == null || d.essence.Length != d.fight.Count) return null;
+                BotMatchSave.Migrate(d);
+                if (d.version != 2 || d.rules != "0.7" || d.frequency < 30 || d.frequency > 240 || d.ticks < 0 || d.ticks > 40000 ||
+                    (int)d.phase < 0 || (int)d.phase >= (int)BotPhase.Finished || (int)d.rewardMode < 0 || (int)d.rewardMode > 1 ||
+                    (int)d.miniGame < 0 || (int)d.miniGame > 2 || (int)d.difficulty < 0 || (int)d.difficulty > 2 ||
+                    d.nextTimedTick <= d.ticks || d.nextTimedTick > d.ticks + d.frequency * 30 ||
+                    d.essence == null || d.essence.Length != d.fight.Count || d.incomeRemainder == null || d.incomeRemainder.Length != d.fight.Count || d.commands == null || d.commands.Count > 200 || d.offers == null || d.offers.Length != d.fight.Count) return null;
                 foreach (double e in d.essence) if (double.IsNaN(e) || double.IsInfinity(e) || e < -0.001 || e > 100000) return null;
+                foreach(int fraction in d.incomeRemainder)if(fraction<0||fraction>=d.frequency*10)return null;
                 int previous = 0; foreach (var c in d.commands) { if (c == null || c.tick < previous || c.tick > d.ticks || c.actor < 0 || c.actor >= d.fight.Count || (int)c.kind < 0 || (int)c.kind > 4) return null; previous = c.tick; }
+                foreach (var offer in d.offers)
+                {
+                    if (offer == null || offer.cards == null || (offer.open && (offer.cards.Length != 3 || offer.deadlineTick < d.ticks || offer.deadlineTick > d.ticks + d.frequency * 7))) return null;
+                    foreach (var card in offer.cards) if (card == null || (int)card.kind < 0 || (int)card.kind > 4 || card.target < -1 || card.target >= d.fight.Count) return null;
+                }
+                if ((d.phase == BotPhase.Choice) != d.offers[0].open) return null;
                 return MiniGameModel.Valid(d.puzzle) ? d : null;
             }
             catch (Exception e) when (e is IOException || e is ArgumentException || e is UnauthorizedAccessException) { return null; }
