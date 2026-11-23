@@ -9,7 +9,7 @@ namespace ArmOrb
         public TextMesh healthLabel;
         public WeaponView Weapon { get; private set; }
         Color color;
-        LineRenderer focusRing, focusSeparator;
+        LineRenderer focusRing, focusSeparator, buildBarrierRing;
         public static readonly Color FocusColor = new Color32(47,107,255,255);
         public bool HasFocus => focusRing != null;
         public static bool IsFocus(bool botFight, bool betFight, int betSelection, int id) => botFight ? id == 0 : betFight && id == betSelection;
@@ -21,6 +21,8 @@ namespace ArmOrb
             focusSeparator = MakeRing("Focus separator", radius + width*.9f, width*1.7f, new Color32(25,25,28,255), 8, material);
             focusRing = MakeRing("Selected orb", radius + width*.9f, width, FocusColor, 9, material);
         }
+        public void SetBuildVisuals(float radius, Material material)
+        { buildBarrierRing=MakeRing("Build barrier",radius*1.24f,.035f,new Color32(90,170,255,255),7,material);buildBarrierRing.enabled=false; }
         LineRenderer MakeRing(string label,float radius,float width,Color tint,int order,Material material)
         {
             var go = new GameObject(label);go.transform.SetParent(transform,false);
@@ -62,16 +64,25 @@ namespace ArmOrb
             Weapon = Instantiate(weaponPrefab, transform.parent);
         }
         public void Hit() => flash = 0.12f;
-        public void Draw(CombatantState state, float radius, float dt, Vector2 position, float angle)
+        public void Draw(CombatantState state, float radius, float dt, Vector2 position, float angle, BuildFighter build = null)
         {
             bool dead=state.Health.IsDead;
             body.enabled=!dead;healthLabel.gameObject.SetActive(!dead);Weapon.gameObject.SetActive(!dead);
             if(focusRing){focusRing.enabled=!dead;focusSeparator.enabled=!dead;}
+            if(buildBarrierRing)buildBarrierRing.enabled=!dead&&build!=null&&build.BarrierTotal>0;
             if(dead){foreach(var ghost in trail)if(ghost)ghost.enabled=false;return;}
             DrawTrail(state,dt,position);
             transform.position = position;
             flash = Mathf.Max(0, flash - dt);
-            body.color = Color.Lerp(color, Color.white, flash / 0.12f);
+            Color tint=color;
+            if(build!=null)
+            {
+                if(build.BurnTime>0)tint=Color.Lerp(tint,new Color(1,.45f,.1f),.22f);
+                if(build.HealFlash>0)tint=Color.Lerp(tint,new Color(.3f,1,.5f),build.HealFlash/.18f*.65f);
+                if(build.CriticalFlash>0)tint=Color.Lerp(tint,new Color(1,.9f,.25f),build.CriticalFlash/.16f*.7f);
+                if(build.Invulnerable>0)tint=Color.Lerp(tint,Color.white,.6f);
+            }
+            body.color = Color.Lerp(tint, Color.white, flash / 0.12f);
             healthLabel.text = HealthText(state.Health.Current);
             healthLabel.characterSize = 0.09f * Mathf.Min(1, 3f / healthLabel.text.Length);
             Weapon.Draw(state, radius, position, angle);

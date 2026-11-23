@@ -88,6 +88,7 @@ namespace ArmOrb
         {
             elapsed+=dt;
             TickUpgrades(dt);
+            TickBuild(dt);
             for(int i=0;i<Orbs.Length;i++)
             {
                 var orb=Orbs[i];alive[i]=!orb.Health.IsDead;
@@ -98,6 +99,7 @@ namespace ArmOrb
                 if(OrbMotion.Move(orb,dt,Size*0.5f,Radius,Gravity,Restitution,MinimumBounce)) Emit(CombatEventKind.Wall,orb.Position,i);
                 orb.Weapon.MeasureSpeed(orb.Velocity);impactDamage[i]=orb.Weapon.Damage;
                 orb.Angle=Mathf.Repeat(orb.Angle+deltaAngle[i],360);orb.AngularTravel+=deltaAngle[i];
+                BuildTravel(i,deltaAngle[i]);
             }
             // All living pairs participate in the same substep, including simultaneous lethal hits.
             for(int a=0;a<Orbs.Length;a++)for(int b=a+1;b<Orbs.Length;b++) if(alive[a]&&alive[b])
@@ -110,6 +112,7 @@ namespace ArmOrb
                 else if((Orbs[a].Position-Orbs[b].Position).sqrMagnitude>(2*Radius+0.03f)*(2*Radius+0.03f))pair.Orb=false;
                 // Save the new body-contact pulse separately from the persistent latch.
                 bodyPulses[a,b]=newContact;
+                if(newContact)BuildBodyContact(a,b);
             }
             for(int i=0;i<Orbs.Length;i++)if(alive[i])
             {
@@ -122,7 +125,7 @@ namespace ArmOrb
             if(poisonClock>=1)
             {
                 poisonClock-=1;
-                for(int i=0;i<Orbs.Length;i++) if(alive[i]&&Orbs[i].Health.PoisonPerSecond>0)
+                for(int i=0;i<Orbs.Length;i++) if(!BuildRules&&alive[i]&&Orbs[i].Health.PoisonPerSecond>0)
                 { Orbs[i].Health.Damage(Orbs[i].Health.PoisonPerSecond);lastDamage=Elapsed;Emit(CombatEventKind.Poison,Orbs[i].Position,i,Orbs[i].Health.PoisonPerSecond); }
             }
             if(Danger&&Elapsed>=90)for(int i=0;i<Orbs.Length;i++)if(alive[i]&&(Elapsed>=120||Orbs[i].Position.sqrMagnitude>SafeRadius*SafeRadius))
@@ -135,6 +138,7 @@ namespace ArmOrb
                 Result=remaining==0?MatchResult.Draw:winner==0?MatchResult.Player:winner==1?MatchResult.Enemy:MatchResult.Other;
                 Emit(CombatEventKind.Finished,Vector2.zero,winner);
             }
+            else if(BuildRules&&Elapsed>=300)ResolveBuildTimeLimit();
         }
         readonly bool[,] bodyPulses=new bool[5,5];
         void Guide(int side,float dt)
@@ -222,6 +226,7 @@ namespace ArmOrb
         }
         void ReturnMelee(int defender,int attacker)
         {
+            if(BuildRules){ReturnBuildMelee(defender,attacker);return;}
             float returned=Orbs[defender].Weapon.Block(Orbs[attacker].Weapon.Damage);
             float before=Orbs[attacker].Health.Current;Orbs[attacker].Health.Damage(returned);
             if(Orbs[attacker].Health.Current<before){Orbs[defender].Weapon.OnHit(Orbs[attacker].Health);lastDamage=Elapsed;MarkContact(defender,attacker);}

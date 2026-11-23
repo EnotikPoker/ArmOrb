@@ -30,7 +30,7 @@ namespace ArmOrb
         static void Classes(VisualElement e,string classes){if(classes!=null)foreach(string c in classes.Split(' '))e.AddToClassList(c);}
         static void Selected(VisualElement e,bool selected)=>e.EnableInClassList("selected",selected);
         void NewPage()
-        {CancelMiniGesture();miniView=null;essenceLabel=null;miniFeedback=null;taskArea=null;root.Clear();overlay=null;calculation=null;speeds.Clear();app=Element(root,"app");previousSize=Vector2Int.zero;UpdateSafeArea();}
+        {ResetBuildUi();root.Clear();overlay=null;calculation=null;speeds.Clear();app=Element(root,"app");previousSize=Vector2Int.zero;UpdateSafeArea();}
         public void ShowSetup()=>ShowHome();
         public void ShowHome()
         {
@@ -45,7 +45,7 @@ namespace ArmOrb
             if(!string.IsNullOrEmpty(game.Error))Text(content,game.Error,"error");
             if(!string.IsNullOrEmpty(game.Wallet.RecoveryMessage))Text(content,game.Wallet.RecoveryMessage,"small muted");
             if(game.ShowTest)TestSetup(content);else if(game.Mode==GameMode.Bots)BotSetup(content);else BetSetup(content);
-            var footer=Element(app,"row footer");Button(footer,"Правила · v0.7",ShowRules,"text-button");sound=Button(footer,"",game.ToggleSound,"text-button");RefreshSound();
+            var footer=Element(app,"row footer");Button(footer,"Правила · v0.8",ShowRules,"text-button");sound=Button(footer,"",game.ToggleSound,"text-button");RefreshSound();
         }
         void TestSetup(VisualElement content)
         {
@@ -172,11 +172,11 @@ namespace ArmOrb
         public void RefreshFight()
         {
             if(game.Simulation==null||timer==null||hp.Count!=game.Simulation.Orbs.Length)return;
-            RefreshMiniGame();
+            RefreshBuildFight();
             var sim=game.Simulation;timer.text=$"{(int)sim.Elapsed/60:00}:{(int)sim.Elapsed%60:00}";
             for(int i=0;i<hp.Count;i++)
             {
-                var orb=sim.Orbs[i];hp[i].text=orb.Health.IsDead?"Выбыл":Mathf.CeilToInt(orb.Health.Current)+" HP";
+                var orb=sim.Orbs[i];hp[i].text=orb.Health.IsDead?"Выбыл":(game.IsBotFight?$"{Mathf.CeilToInt(orb.Health.Current)}/{orb.Health.Maximum:0}"+(sim.Builds[i].BarrierTotal>0?$" · Б {sim.Builds[i].BarrierTotal:0}":""):Mathf.CeilToInt(orb.Health.Current)+" HP");
                 stats[i].text=orb.Health.IsDead?$"#{i+1} — выбыл":$"#{i+1} · {orb.Weapon.Stat}"+(orb.Health.PoisonPerSecond>0?$" · Яд −{orb.Health.PoisonPerSecond:0.#}/с":"");
                 reload[i].parent.style.visibility=orb.Weapon.IsRanged&&!orb.Health.IsDead?Visibility.Visible:Visibility.Hidden;
                 reload[i].style.width=Length.Percent(orb.Weapon.IsBursting?0:100*(1-Mathf.Clamp01(orb.Weapon.ReloadRemaining/orb.Weapon.Cooldown)));
@@ -222,7 +222,7 @@ namespace ArmOrb
                 "Лук выпускает очередь с интервалом 0,06 с, арбалет — одновременный веер. Попадание добавляет стрелу следующему выстрелу. Перезарядка 1 с; у сюрикена 0,8 с.",
                 "Посох: огненный шар каждую секунду; волна наносит 3 урона каждому врагу один раз. Радиус растёт на 0,35 за попадание. Сюрикен: +1 отскок за попадание.",
                 "Выбывшие больше не атакуют; уже выпущенные снаряды и наложенный яд остаются. Собственные снаряды не опасны. Усиления сбрасываются между боями.",
-                "Битва с ботами: 1–4 противника, 300 HP. После успешного задания перерыв 3 с. Выбор одного из трёх навыков длится 7 с и не останавливает бой; первый доступный применяется автоматически. Развитие по шкале 60 эссенции либо покупки каждые 30 с. С 90 с сужение. Эссенция и навыки действуют только в этом матче.",
+                "Битва с ботами: 1–4 противника, 300 HP. Стартовый навык и новый выбор каждые 20 с. Три варианта: только улучшения, способность или искры. На выбор 7 с; бой продолжается. Без сужения. Через 5 минут победитель определяется по доле оставшегося HP. Улучшения действуют только в этом матче.",
                 "При балансе меньше 10 монет и отсутствии незавершённой ставки можно бесплатно восстановить баланс до 1000."};
             foreach(string rule in rules)Text(scroll,rule,"rule");Button(card,"Закрыть",CloseOverlay,"primary");
         }

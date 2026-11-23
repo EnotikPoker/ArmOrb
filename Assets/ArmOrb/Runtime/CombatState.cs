@@ -4,15 +4,21 @@ namespace ArmOrb
 {
     public sealed class HealthState
     {
-        public float Maximum { get; }
-        public float Current { get; private set; }
+        public float Maximum { get; private set; }
+        float current;
+        double preciseHealth;
+        bool precise;
+        public float Current { get => precise ? (float)preciseHealth : current; private set { current = value; preciseHealth = value; } }
         public float PoisonPerSecond { get; private set; }
-        public bool IsDead => Current <= 0;
+        public bool IsDead => precise ? preciseHealth <= 0 : Current <= 0;
+        public void EnablePrecision() { preciseHealth = Current; precise = true; }
         public HealthState(float health) { Maximum = Current = Mathf.Max(1, health); }
-        public void Damage(float amount) => Current = Mathf.Max(0, Current - Mathf.Max(0, amount) * DamageMultiplier);
+        public void Damage(float amount) { if (precise) preciseHealth = System.Math.Max(0, preciseHealth - Mathf.Max(0, amount) * DamageMultiplier); else Current = Mathf.Max(0, Current - Mathf.Max(0, amount) * DamageMultiplier); }
         public void DangerDamage(float amount) => Current = Mathf.Max(0, Current - Mathf.Max(0, amount));
         public float DamageMultiplier = 1;
-        public void Heal(float amount) { if (!IsDead) Current = Mathf.Min(Maximum, Current + Mathf.Max(0, amount)); }
+        public void Heal(float amount) { if (IsDead) return; if (precise) preciseHealth = System.Math.Min(Maximum, preciseHealth + Mathf.Max(0, amount)); else Current = Mathf.Min(Maximum, Current + Mathf.Max(0, amount)); }
+        public void IncreaseMaximum(float amount) { amount = Mathf.Max(0, amount); Maximum += amount; if (!IsDead) { if (precise) preciseHealth += amount; else Current += amount; } }
+        public void Revive(float fraction) { if (IsDead) Current = Maximum * Mathf.Clamp01(fraction); }
         public void AddPoison(float amount) => PoisonPerSecond += Mathf.Max(0, amount);
     }
 
@@ -28,7 +34,10 @@ namespace ArmOrb
         float purchasedSpeedMultiplier = 1;
         public float UnarmedWorldLimit => UnarmedMaxSpeed*SpeedUnit*purchasedSpeedMultiplier;
         public void MeasureSpeed(Vector2 velocity) => CurrentSpeed=velocity.magnitude/(Kind==WeaponKind.Unarmed?SpeedUnit:1);
-        public float Reach { get; private set; }
+        float reach;
+        public float BuildReachMultiplier = 1, GrowthMultiplier = 1;
+        float growthCarry;
+        public float Reach { get => reach * BuildReachMultiplier; private set => reach = value; }
         public float RotationSpeed { get; private set; }
         public float Reflection => 1;
         public float ShieldWidth { get; private set; } = 2.1f;
@@ -70,16 +79,20 @@ namespace ArmOrb
             Hits++;
             switch (Kind)
             {
-                case WeaponKind.Unarmed: SpeedBonus = Mathf.Min(12-initialUnarmedMaxSpeed, SpeedBonus + Growth); break;
+                case WeaponKind.Unarmed: SpeedBonus = Mathf.Min(12-initialUnarmedMaxSpeed, SpeedBonus + Growth * GrowthMultiplier); break;
                 case WeaponKind.Bow:
-                case WeaponKind.Crossbow: ArrowCount++; break;
-                case WeaponKind.Shield: ShieldWidth += Growth; break;
-                case WeaponKind.Staff: BlastRadius += Growth; break;
-                case WeaponKind.Shuriken: Bounces++; break;
-                case WeaponKind.Sword: Damage += Growth; break;
-                case WeaponKind.Spear: Reach += Growth; break;
-                case WeaponKind.Blade: RotationSpeed = (float)System.Math.Sqrt((double)RotationSpeed * RotationSpeed + rotationGrowthSquared); break;
-                case WeaponKind.Scythe: target.AddPoison(Growth); break;
+                case WeaponKind.Crossbow:
+                    if (GrowthMultiplier == 1) ArrowCount++; else { growthCarry += GrowthMultiplier; int gain = Mathf.FloorToInt(growthCarry); ArrowCount += gain; growthCarry -= gain; } break;
+                case WeaponKind.Shield: ShieldWidth += Growth * GrowthMultiplier; break;
+                case WeaponKind.Staff: BlastRadius += Growth * GrowthMultiplier; break;
+                case WeaponKind.Shuriken:
+                    if (GrowthMultiplier == 1) Bounces++; else { growthCarry += GrowthMultiplier; int gain = Mathf.FloorToInt(growthCarry); Bounces += gain; growthCarry -= gain; } break;
+                case WeaponKind.Sword: Damage += Growth * GrowthMultiplier; break;
+                case WeaponKind.Spear: reach += Growth * GrowthMultiplier; break;
+                case WeaponKind.Blade:
+                    float next = (float)System.Math.Sqrt((double)RotationSpeed * RotationSpeed + rotationGrowthSquared);
+                    RotationSpeed = GrowthMultiplier == 1 ? next : RotationSpeed + (next - RotationSpeed) * GrowthMultiplier; break;
+                case WeaponKind.Scythe: target.AddPoison(Growth * GrowthMultiplier); break;
             }
         }
         public void Upgrade()
@@ -129,7 +142,7 @@ namespace ArmOrb
     }
 
     public enum MatchResult { InProgress, Player, Enemy, Draw, Other }
-    public enum CombatEventKind { Wall, Body, Hit, Clash, Block, Poison, Shot, Explosion, Finished }
+    public enum CombatEventKind { Wall, Body, Hit, Clash, Block, Poison, Shot, Explosion, Finished, Healing, Critical, Barrier, Revive, Burning, Upgrade }
     public readonly struct CombatEvent
     {
         public readonly CombatEventKind Kind;
