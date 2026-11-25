@@ -7,7 +7,8 @@ namespace ArmOrb
 {
     [Serializable] public sealed class BuildMatchSave
     {
-        public int version = 3;
+        public int version = 4;
+        public int choiceSeconds = 8;
         public string rules = "0.8";
         public FightDefinition fight;
         public BattleVariant variant;
@@ -20,6 +21,15 @@ namespace ArmOrb
         public List<BuildCommand> commands = new List<BuildCommand>();
         public string notice = "";
         public int noticeTick;
+        public static void Migrate(BuildMatchSave data)
+        {
+            if(data == null || data.version != 3 || data.rules != "0.8") return;
+            if(data.frequency < 30 || data.frequency > 240 || data.offers == null) return;
+            // Journal, variant and simulation rules stay intact. Only the UI deadline changes.
+            foreach(var offer in data.offers) if(offer != null && offer.open)
+                offer.deadlineTick += data.frequency;
+            data.choiceSeconds = 8; data.version = 4;
+        }
     }
 
     public sealed class BuildMatchController
@@ -28,7 +38,7 @@ namespace ArmOrb
         public ArenaSimulation Simulation { get; }
         public bool Active => Data.phase != BotPhase.Finished;
         public int NextOfferSeconds => Data.nextTimedTick / Data.frequency;
-        public float ChoiceRemaining => Mathf.Max(0, !Data.started ? 7-Data.draftTicks/(float)Data.frequency : (Data.offers[0].deadlineTick-Data.ticks)/(float)Data.frequency);
+        public float ChoiceRemaining => Mathf.Max(0, !Data.started ? Data.choiceSeconds-Data.draftTicks/(float)Data.frequency : (Data.offers[0].deadlineTick-Data.ticks)/(float)Data.frequency);
         public string Notice => Data.ticks-Data.noticeTick < Data.frequency*3 ? Data.notice : "";
         public static FightDefinition CreateOffer(int weapon,int bots,int seed)
         {var f=BotMatchController.CreateOffer(weapon,bots,seed);f.danger=false;return f;}
@@ -40,11 +50,12 @@ namespace ArmOrb
             for(int i=0;i<fight.Count;i++){save.offers[i]=new BuildOffer();if(i>0)save.abilities[i]=(BattleAbility)MatchRandom.Range(ref rng,2);}
             return save;
         }
-        public BuildMatchController(SimulationFactory factory,FightDefinition fight,BattleVariant variant=BattleVariant.Builds,BotDifficulty difficulty=BotDifficulty.Normal,BattleAbility ability=BattleAbility.Heal)
+        public BuildMatchController(SimulationFactory factory,FightDefinition fight,BattleVariant variant=BattleVariant.Ability,BotDifficulty difficulty=BotDifficulty.Normal,BattleAbility ability=BattleAbility.Heal)
             : this(factory,NewSave(factory,fight,variant,difficulty,ability),false) { }
         public BuildMatchController(SimulationFactory factory,BuildMatchSave save) : this(factory,save,true) { }
         BuildMatchController(SimulationFactory factory,BuildMatchSave save,bool restore)
         {
+            BuildMatchSave.Migrate(save);
             if(save.frequency!=factory.Frequency||save.rules!="0.8"||save.fight.danger)throw new InvalidDataException("Battle rules changed");
             Data=save;Simulation=factory.Create(save.fight);Simulation.EnableBuildRules(save.variant,save.abilities);
             if(!restore){for(int i=0;i<save.fight.Count;i++)OpenOffer(i);return;}
@@ -75,7 +86,7 @@ namespace ArmOrb
         {
             if(!Active)return;
             if(!Data.started)
-            {Data.draftTicks++;if(Data.draftTicks>=Data.frequency*7)Choose(AutoChoice());return;}
+            {Data.draftTicks++;if(Data.draftTicks>=Data.frequency*Data.choiceSeconds)Choose(AutoChoice());return;}
             Simulation.Step(dt);Data.ticks=Simulation.TickCount;
             if(Simulation.Result!=MatchResult.InProgress||Simulation.Orbs[0].Health.IsDead)
             {
@@ -136,7 +147,7 @@ namespace ArmOrb
             foreach(var skill in candidates){if(chosen.Count>=3)break;chosen.Add(skill);}
             var cards=new BuildCard[chosen.Count];for(int i=0;i<cards.Length;i++)cards[i]=new BuildCard{skill=chosen[i]};
             int delay=Data.difficulty==BotDifficulty.Easy?4:Data.difficulty==BotDifficulty.Normal?2:1;
-            Data.offers[actor]=new BuildOffer{open=true,id=++Data.sequence,cards=cards,deadlineTick=Data.ticks+7*Data.frequency,actionTick=Data.ticks+delay*Data.frequency};
+            Data.offers[actor]=new BuildOffer{open=true,id=++Data.sequence,cards=cards,deadlineTick=Data.ticks+Data.choiceSeconds*Data.frequency,actionTick=Data.ticks+delay*Data.frequency};
             Simulation.Builds[actor].OfferOpen=true;Record(BuildCommandKind.OfferOpen,actor);
             if(actor==0)Data.phase=BotPhase.Choice;return true;
         }
@@ -210,8 +221,9 @@ namespace ArmOrb
             try
             {
                 if(!File.Exists(file))return null;var d=JsonUtility.FromJson<BuildMatchSave>(File.ReadAllText(file));
-                if(d==null||d.version!=3||d.rules!="0.8"||d.fight==null||!d.fight.IsValid()||d.fight.danger||
-                    d.frequency<30||d.frequency>240||d.ticks<0||d.ticks>d.frequency*300||d.draftTicks<0||d.draftTicks>d.frequency*7||
+                BuildMatchSave.Migrate(d);
+                if(d==null||d.version!=4||d.choiceSeconds!=8||d.rules!="0.8"||d.fight==null||!d.fight.IsValid()||d.fight.danger||
+                    d.frequency<30||d.frequency>240||d.ticks<0||d.ticks>d.frequency*300||d.draftTicks<0||d.draftTicks>d.frequency*d.choiceSeconds||
                     (int)d.variant<0||(int)d.variant>2||(int)d.difficulty<0||(int)d.difficulty>2||(int)d.phase<0||(int)d.phase>=2||
                     d.abilities==null||d.abilities.Length!=d.fight.Count||d.offers==null||d.offers.Length!=d.fight.Count||d.commands==null||d.commands.Count>5000||
                     d.nextTimedTick<=d.ticks||d.nextTimedTick>d.ticks+20*d.frequency||(!d.started&&d.ticks!=0))return null;
@@ -224,7 +236,7 @@ namespace ArmOrb
                 }
                 foreach(var offer in d.offers)
                 {
-                    if(offer==null||offer.cards==null||offer.cards.Length>3||(offer.open&&(offer.cards.Length==0||offer.deadlineTick<d.ticks||offer.deadlineTick>d.ticks+7*d.frequency)))return null;
+                    if(offer==null||offer.cards==null||offer.cards.Length>3||(offer.open&&(offer.cards.Length==0||offer.deadlineTick<d.ticks||offer.deadlineTick>d.ticks+d.choiceSeconds*d.frequency)))return null;
                     var seen=new HashSet<BuildSkill>();foreach(var card in offer.cards)if(card==null||(int)card.skill<0||(int)card.skill>=BuildSkills.Count||!seen.Add(card.skill))return null;
                 }
                 if((d.phase==BotPhase.Choice)!=d.offers[0].open)return null;return d;

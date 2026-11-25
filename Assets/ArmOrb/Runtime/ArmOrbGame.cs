@@ -22,6 +22,7 @@ namespace ArmOrb
         public bool IsBetFight { get; private set; }
         public bool IsRestoring=>restoring!=null || botRestoring!=null;
         public GameMode Mode { get; private set; }
+        public bool AtMainMenu { get; private set; } = true;
         public bool ShowTest => Mode == GameMode.Test;
         public bool IsBotFight { get; private set; }
         public BuildMatchController BotMatch { get; private set; }
@@ -74,21 +75,27 @@ namespace ArmOrb
             BotStore = new BuildMatchStore(System.IO.Path.Combine(Application.persistentDataPath,"v06"));
             BotWeapon = Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.BotWeapon",0),0,9);
             BotCount = Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.BotCount",3),1,4);
-            BotVariant = (BattleVariant)Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.BotVariant",0),0,2);
+            BotVariant = BattleVariant.Ability;
             BotAbility = (BattleAbility)Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.BotAbility",0),0,1);
             BotLevel = (BotDifficulty)Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.BotLevel",1),0,2);
             Mode = (GameMode)Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.Mode",0),0,2);
             BotOffer = BuildMatchController.CreateOffer(BotWeapon,BotCount,random.Next(1,int.MaxValue));
             ArenaTexture=new RenderTexture(1024,1024,16,RenderTextureFormat.ARGB32){name="ArmOrb Arena"};ArenaTexture.Create();arenaCamera.targetTexture=ArenaTexture;
             projectileView=new ProjectileView(transform,weapons,arenaView.boundary.sharedMaterial);
-            ui=new GameInterface(this);if(Mode==GameMode.Bets&&Wallet.Data.pending==null)NewOffer();else ui.ShowHome();TryAndroidQa();
+            ui=new GameInterface(this);ui.ShowHome();TryAndroidQa();
         }
         public void SelectMode(GameMode mode)
         {
             if(IsRestoring)return;
-            Mode=mode;Error=null;PlayerPrefs.SetInt("ArmOrb.Mode",(int)mode);PlayerPrefs.Save();
+            AtMainMenu=false;Mode=mode;Error=null;PlayerPrefs.SetInt("ArmOrb.Mode",(int)mode);PlayerPrefs.Save();
             if(mode!=GameMode.Bets&&Calculator!=null){Calculator.Dispose();Calculator=null;Offer=null;Quote=null;}
             if(mode==GameMode.Bets&&Offer==null&&Wallet.Data.pending==null)NewOffer();else ui.ShowHome();
+        }
+        public void OpenMainMenu()
+        {
+            if(IsRestoring)return;
+            if(IsInFight) { BackToSetup(); if(IsInFight)return; }
+            AtMainMenu=true;ui.ShowHome();
         }
         public void ConfigureBots(bool reroll = false)
         {
@@ -101,13 +108,13 @@ namespace ArmOrb
         {
             if(IsRestoring||BotStore.Pending!=null)return;
             Calculator?.Dispose();Calculator=null;ClearFight();IsBetFight=false;IsBotFight=true;botResultShown=false;
-            CurrentFight=BotOffer.Copy();BotMatch=new BuildMatchController(factory,CurrentFight,BotVariant,BotLevel,BotAbility);
+            BotVariant=BattleVariant.Ability;CurrentFight=BotOffer.Copy();BotMatch=new BuildMatchController(factory,CurrentFight,BattleVariant.Ability,BotLevel,BotAbility);
             Simulation=BotMatch.Simulation;AttachFight();SavePending();
         }
         public void ResumeBots()
         {
             if(IsRestoring||BotStore.Pending==null)return;
-            ClearFight();IsBetFight=false;IsBotFight=true;botResultShown=false;
+            AtMainMenu=false;Mode=GameMode.Bots;ClearFight();IsBetFight=false;IsBotFight=true;botResultShown=false;
             var save=BotStore.Pending;CurrentFight=save.fight.Copy();
             botRestoring=Task.Run(()=>new BuildMatchController(factory,save));ui.ShowHome();
         }
@@ -189,7 +196,7 @@ namespace ArmOrb
         public void ResumeBet()
         {
             if(Wallet.Data.pending==null||IsRestoring)return;
-            ClearFight();IsBotFight=false;BotMatch=null;var pending=Wallet.Data.pending;CurrentFight=pending.fight.Copy();IsBetFight=true;
+            AtMainMenu=false;Mode=GameMode.Bets;ClearFight();IsBotFight=false;BotMatch=null;var pending=Wallet.Data.pending;CurrentFight=pending.fight.Copy();IsBetFight=true;
             LastStake=pending.stake;LastBetSelection=pending.selection;activeBetId=pending.id;
             int ticks=pending.ticks;int frequency=factory.Frequency;var definition=CurrentFight.Copy();
             restoring=Task.Run(()=>
@@ -235,9 +242,9 @@ namespace ArmOrb
                 {
                     if(Calculator.Work.Status==TaskStatus.RanToCompletion)Quote=Calculator.Work.Result;
                     else if(Calculator.Work.IsFaulted){Error="Расчёт не завершён. Попробуй другой бой.";Debug.LogException(Calculator.Work.Exception);}
-                    Calculator.Dispose();Calculator=null;if(!IsInFight)ui.ShowHome();
+                    Calculator.Dispose();Calculator=null;if(!IsInFight&&!AtMainMenu&&Mode==GameMode.Bets)ui.RefreshQuote();
                 }
-                else if(!IsInFight)ui.RefreshCalculation();
+                else if(!IsInFight&&!AtMainMenu&&Mode==GameMode.Bets)ui.RefreshCalculation();
             }
             if(restoring!=null&&restoring.IsCompleted)
             {
@@ -261,7 +268,7 @@ namespace ArmOrb
             }
             if(Input.GetKeyDown(KeyCode.Escape))
             {
-                if(IsInFight&&IsBotFight&&BotMatch.Data.phase==BotPhase.Finished)BackToSetup();else if(IsInFight&&Simulation.Result==MatchResult.InProgress)TogglePause();else if(IsInFight)BackToSetup();
+                if(IsInFight&&IsBotFight&&BotMatch.Data.phase==BotPhase.Finished)BackToSetup();else if(IsInFight&&Simulation.Result==MatchResult.InProgress)TogglePause();else if(IsInFight)BackToSetup();else if(!AtMainMenu)OpenMainMenu();
             }
             if(!IsInFight||Simulation==null)return;
             if(!IsPaused&&Simulation.Result==MatchResult.InProgress)
