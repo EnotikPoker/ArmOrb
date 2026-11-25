@@ -204,11 +204,11 @@ namespace ArmOrb.Tests
             var m=Match();var pos=m.Simulation.Orbs[0].Position;Run(m,120);Assert.That(m.Simulation.TickCount,Is.Zero);Assert.That(m.Simulation.Orbs[0].Position,Is.EqualTo(pos));
             Assert.That(m.Choose(m.AutoChoice()),Is.True);Assert.That(m.Data.commands.Count(c=>c.kind==BuildCommandKind.Upgrade),Is.EqualTo(2));
             Run(m,2399);Assert.That(m.Data.offers[0].open,Is.False);Run(m,1);Assert.That(m.Data.offers[0].open,Is.True);int tick=m.Data.ticks;
-            Run(m,840);Assert.That(m.Data.offers[0].open,Is.False);Assert.That(m.Data.ticks,Is.EqualTo(tick+840));Assert.That(m.Data.commands.Count(c=>c.kind==BuildCommandKind.Upgrade&&c.actor==0),Is.EqualTo(2));
+            Run(m,960);Assert.That(m.Data.offers[0].open,Is.False);Assert.That(m.Data.ticks,Is.EqualTo(tick+960));Assert.That(m.Data.commands.Count(c=>c.kind==BuildCommandKind.Upgrade&&c.actor==0),Is.EqualTo(2));
         }
-        [Test] public void StartingDraftAutomaticallyChoosesAtSevenSecondsAndSurvivesReload()
+        [Test] public void StartingDraftAutomaticallyChoosesAtEightSecondsAndSurvivesReload()
         {
-            var m=Match();Run(m,500);var restored=new BuildMatchController(Factory(),Clone(m.Data));Same(m,restored);Run(m,340);Run(restored,340);Same(m,restored);Assert.That(m.Data.started,Is.True);Assert.That(m.Simulation.TickCount,Is.Zero);
+            var m=Match();Run(m,500);var restored=new BuildMatchController(Factory(),Clone(m.Data));Same(m,restored);Run(m,460);Run(restored,460);Same(m,restored);Assert.That(m.Data.started,Is.True);Assert.That(m.Simulation.TickCount,Is.Zero);
         }
         [TestCase(BattleVariant.Builds)] [TestCase(BattleVariant.Ability)] [TestCase(BattleVariant.Sparks)]
         public void SavedChoicesActionsAndFutureStagesReplayExactly(BattleVariant variant)
