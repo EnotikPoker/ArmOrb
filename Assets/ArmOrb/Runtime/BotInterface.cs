@@ -72,7 +72,8 @@ namespace ArmOrb
         {
             NewPage();hp.Clear();stats.Clear();reload.Clear();app.AddToClassList("bot-fight");app.AddToClassList("build-fight");
             var header=Element(app,"row header");IconButton(header,UiSymbol.Back,"",game.BackToSetup,"fight-menu");
-            timer=Text(header,"00:00","timer");IconButton(header,UiSymbol.Pause,"",game.TogglePause,"pause");
+            timer=Text(header,"00:00","timer");
+            if(game.IsRunFight)Text(header,$"{game.Run.Data.stage+1}/5","run-stage-badge");IconButton(header,UiSymbol.Pause,"",game.TogglePause,"pause");
             var participants=Element(app,"fight-participants");for(int i=0;i<game.CurrentFight.Count;i++)AddParticipant(participants,i,true);
             var holder=Element(app,"arena-holder bot-arena-holder");
             var field=new Image{image=game.ArenaTexture,scaleMode=ScaleMode.StretchToFill,pickingMode=PickingMode.Ignore,name="arena"};field.AddToClassList("arena");holder.Add(field);
@@ -119,7 +120,7 @@ namespace ArmOrb
                 var art=Element(button,"skill-art");art.Add(new InterfaceIcon(skill));
                 var content=Element(button,"skill-content");var top=Element(content,"row skill-top");Text(top,BuildSkills.Name(skill),"skill-title");
                 Text(top,BuildSkills.MaxLevel(skill)>1?$"{level}/{BuildSkills.MaxLevel(skill)}":"★","skill-level");
-                Text(content,InterfacePresentation.SkillSummary(skill,level,b.InitialHP,game.Simulation.Orbs[0].Weapon.Kind),"skill-description");
+                Text(content,InterfacePresentation.SkillSummary(skill,level,b.InitialHP,game.Simulation.Orbs[0].Weapon.Kind)+(game.IsRunFight&&(skill==BuildSkill.Resurrection||skill==BuildSkill.SecondWind)?" · раз за забег":""),"skill-description");
                 autoLabels.Add(Text(button,"","skill-auto"));IgnoreChildren(button);
             }
         }
@@ -137,6 +138,7 @@ namespace ArmOrb
         void ShowSkillDetail(int actor,BuildSkill skill,int level)
         {
             var b=game.Simulation.Builds[actor];string text=BuildSkills.Name(skill)+" · "+level+"\n"+BuildSkills.Description(skill,level,b.InitialHP,game.Simulation.Orbs[actor].Weapon.Kind);
+            if(game.IsRunFight&&(skill==BuildSkill.Resurrection||skill==BuildSkill.SecondWind))text+="\nОдно срабатывание на весь забег.";
             if(inspected>=0){SetLabel(inspectionEffects,text);nextDetailsRefresh=Time.unscaledTime+4;}
             else SetLabel(buildDetail,text);
         }

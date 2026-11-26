@@ -142,7 +142,7 @@ namespace ArmOrb.Editor
         static void ConfigurePlayer()
         {
             PlayerSettings.companyName = "EnotikPoker"; PlayerSettings.productName = "ArmOrb";
-            PlayerSettings.bundleVersion = "0.9.0"; PlayerSettings.Android.bundleVersionCode = 10;
+            PlayerSettings.bundleVersion = "0.10.0"; PlayerSettings.Android.bundleVersionCode = 11;
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.enotikpoker.armorb");
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
             PlayerSettings.allowedAutorotateToLandscapeLeft = false; PlayerSettings.allowedAutorotateToLandscapeRight = false;

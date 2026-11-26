@@ -138,7 +138,7 @@ namespace ArmOrb
                 Result=remaining==0?MatchResult.Draw:winner==0?MatchResult.Player:winner==1?MatchResult.Enemy:MatchResult.Other;
                 Emit(CombatEventKind.Finished,Vector2.zero,winner);
             }
-            else if(BuildRules&&Elapsed>=300)ResolveBuildTimeLimit();
+            else if(BuildRules&&Elapsed>=BuildTimeLimit)ResolveBuildTimeLimit();
         }
         readonly bool[,] bodyPulses=new bool[5,5];
         void Guide(int side,float dt)

@@ -15,7 +15,9 @@ namespace ArmOrb
         public BotDifficulty difficulty;
         public BattleAbility[] abilities;
         public int frequency = 120, ticks, draftTicks, outcome, sequence, nextTimedTick;
-        public bool started;
+        public bool started, runBattle, runFirst;
+        public int runStage;
+        public RunFighterState runPlayer;
         public BotPhase phase;
         public BuildOffer[] offers;
         public List<BuildCommand> commands = new List<BuildCommand>();
@@ -52,13 +54,27 @@ namespace ArmOrb
         }
         public BuildMatchController(SimulationFactory factory,FightDefinition fight,BattleVariant variant=BattleVariant.Ability,BotDifficulty difficulty=BotDifficulty.Normal,BattleAbility ability=BattleAbility.Heal)
             : this(factory,NewSave(factory,fight,variant,difficulty,ability),false) { }
+        public BuildMatchController(SimulationFactory factory,FightDefinition fight,RunFighterState player,int stage,bool first,BattleAbility ability)
+            : this(factory,RunSave(factory,fight,player,stage,first,ability),false) { }
+        static BuildMatchSave RunSave(SimulationFactory factory,FightDefinition fight,RunFighterState player,int stage,bool first,BattleAbility ability)
+        {
+            var save=NewSave(factory,fight,BattleVariant.Ability,BotDifficulty.Normal,ability);
+            save.runBattle=true;save.runStage=stage;save.runFirst=first;
+            save.runPlayer=JsonUtility.FromJson<RunFighterState>(JsonUtility.ToJson(player));return save;
+        }
         public BuildMatchController(SimulationFactory factory,BuildMatchSave save) : this(factory,save,true) { }
         BuildMatchController(SimulationFactory factory,BuildMatchSave save,bool restore)
         {
             BuildMatchSave.Migrate(save);
             if(save.frequency!=factory.Frequency||save.rules!="0.8"||save.fight.danger)throw new InvalidDataException("Battle rules changed");
             Data=save;Simulation=factory.Create(save.fight);Simulation.EnableBuildRules(save.variant,save.abilities);
-            if(!restore){for(int i=0;i<save.fight.Count;i++)OpenOffer(i);return;}
+            if(save.runBattle)InitializeRun();
+            if(!restore)
+            {
+                if(save.runBattle){if(save.runFirst)OpenOffer(0);else Data.started=true;}
+                else for(int i=0;i<save.fight.Count;i++)OpenOffer(i);
+                return;
+            }
             int command=0;
             while(true)
             {
@@ -68,7 +84,27 @@ namespace ArmOrb
                 Simulation.Step(1f/save.frequency);
             }
             if(command!=save.commands.Count)throw new InvalidDataException("Invalid command time");
+            if(save.phase==BotPhase.Finished)foreach(var b in Simulation.Builds)b.OfferOpen=false;
             for(int i=0;i<save.fight.Count;i++)if(Simulation.Builds[i].OfferOpen!=save.offers[i].open)throw new InvalidDataException("Invalid offer state");
+        }
+        void InitializeRun()
+        {
+            if(Data.runStage<0||Data.runStage>4||!RunFighterState.Valid(Data.runPlayer))throw new InvalidDataException("Invalid run stage");
+            Simulation.SetRunTimeLimit();
+            var player=Data.runPlayer;
+            for(int i=0;i<BuildSkills.Count;i++)for(int n=0;n<player.levels[i];n++)
+                if(!Simulation.ApplyBuildSkill(0,(BuildSkill)i))throw new InvalidDataException("Invalid carried skill");
+            if(player.hp>Simulation.Orbs[0].Health.Maximum+.001f)throw new InvalidDataException("Invalid carried HP");
+            Simulation.Orbs[0].Health.RestoreCurrent(player.hp);
+            Simulation.Builds[0].ResurrectionUsed=player.resurrectionUsed;Simulation.Builds[0].SecondWindUsed=player.secondWindUsed;
+            int ranks=new[]{0,1,3,3,5}[Data.runStage];
+            for(int actor=1;actor<Simulation.Orbs.Length;actor++)
+            {
+                bool shield=Simulation.Orbs[actor].Weapon.Kind==WeaponKind.Shield;
+                var skills=shield?new[]{BuildSkill.Armor,BuildSkill.Barrier,BuildSkill.ShieldStorage,BuildSkill.Armor,BuildSkill.Barrier}:
+                    new[]{BuildSkill.Power,BuildSkill.Armor,BuildSkills.Special(Simulation.Orbs[actor].Weapon.Kind),BuildSkill.Power,BuildSkill.Armor};
+                for(int n=0;n<ranks;n++)if(!Simulation.ApplyBuildSkill(actor,skills[n]))throw new InvalidDataException("Invalid enemy build");
+            }
         }
         void Replay(BuildCommand command)
         {
@@ -222,7 +258,7 @@ namespace ArmOrb
             {
                 if(!File.Exists(file))return null;var d=JsonUtility.FromJson<BuildMatchSave>(File.ReadAllText(file));
                 BuildMatchSave.Migrate(d);
-                if(d==null||d.version!=4||d.choiceSeconds!=8||d.rules!="0.8"||d.fight==null||!d.fight.IsValid()||d.fight.danger||
+                if(d==null||d.runBattle||d.version!=4||d.choiceSeconds!=8||d.rules!="0.8"||d.fight==null||!d.fight.IsValid()||d.fight.danger||
                     d.frequency<30||d.frequency>240||d.ticks<0||d.ticks>d.frequency*300||d.draftTicks<0||d.draftTicks>d.frequency*d.choiceSeconds||
                     (int)d.variant<0||(int)d.variant>2||(int)d.difficulty<0||(int)d.difficulty>2||(int)d.phase<0||(int)d.phase>=2||
                     d.abilities==null||d.abilities.Length!=d.fight.Count||d.offers==null||d.offers.Length!=d.fight.Count||d.commands==null||d.commands.Count>5000||

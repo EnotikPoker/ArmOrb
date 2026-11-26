@@ -9,6 +9,8 @@ namespace ArmOrb
     public sealed partial class ArenaSimulation
     {
         public bool BuildRules { get; private set; }
+        public float BuildTimeLimit { get; private set; } = 300;
+        public void SetRunTimeLimit() { if(!BuildRules || TickCount!=0)throw new InvalidOperationException("Run rules require a fresh build battle");BuildTimeLimit=120; }
         public BattleVariant BuildVariant { get; private set; }
         public BuildFighter[] Builds { get; private set; }
         sealed class Echo

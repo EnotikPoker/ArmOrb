@@ -39,7 +39,7 @@ namespace ArmOrb
             if(game.AtMainMenu){ShowMainMenu();return;}
             var header=Element(app,"row header");
             IconButton(header,UiSymbol.Back,"Назад",game.OpenMainMenu,"back-main");
-            Text(header,game.Mode==GameMode.Bots?"Битва с ботами":game.Mode==GameMode.Bets?"Ставки":"Тест","page-title");
+            Text(header,game.Mode==GameMode.Bots?"Битва с ботами":game.Mode==GameMode.Bets?"Ставки":game.Mode==GameMode.Runs?"Забег":game.Mode==GameMode.Collection?"Коллекция":"Тест","page-title");
             IconButton(header,UiSymbol.Settings,"",ShowSettings,"settings");
             var scroll=new ScrollView(ScrollViewMode.Vertical);scroll.AddToClassList("setup-scroll");app.Add(scroll);
             var content=Element(scroll.contentContainer,"home-content");
@@ -49,7 +49,7 @@ namespace ArmOrb
                 CoinBalance(content);
                 if(!string.IsNullOrEmpty(game.Wallet.RecoveryMessage))Text(content,game.Wallet.RecoveryMessage,"small muted");
             }
-            if(game.ShowTest)TestSetup(content);else if(game.Mode==GameMode.Bots)BotSetup(content);else BetSetup(content);
+            if(game.ShowTest)TestSetup(content);else if(game.Mode==GameMode.Bots)BotSetup(content);else if(game.Mode==GameMode.Runs)RunSetup(content);else if(game.Mode==GameMode.Collection)CollectionSetup(content);else BetSetup(content);
         }
         void TestSetup(VisualElement content)
         {
@@ -90,7 +90,7 @@ namespace ArmOrb
                 for(int i=0;i<pending.fight.Count;i++)Text(content,$"#{i+1} {game.weapons[pending.fight.weapons[i]].displayName} · {pending.fight.health[i]} HP"+(i==pending.selection?" ★":""),"rule");
                 Button(content,"Продолжить бой",game.ResumeBet,"primary").name="continue-bet";return;
             }
-            if(game.Wallet.Data.balance<10)Button(content,"Получить 1000 монет",game.Refill,"secondary").name="refill-coins";
+            if(game.Wallet.Data.balance<10)Button(content,"Получить 1000 жетонов",game.Refill,"secondary").name="refill-coins";
             if(game.Offer==null){Text(content,"Новый бой","section-name");Button(content,"Подобрать бой",game.NewOffer,"primary").name="new-offer";return;}
             var f=game.Offer;betSelection=Mathf.Clamp(betSelection,0,f.Count-1);
             Conditions(content,f);
@@ -119,7 +119,7 @@ namespace ArmOrb
                 bool valid=game.Quote!=null&&stake>=10&&stake%10==0&&stake<=game.Wallet.Data.balance;
                 try
                 {
-                    payment.text=game.Quote==null?"Расчёт коэффициентов…":$"Выплата при победе: {WalletStore.Payout(Math.Max(0,stake),game.Quote.Hundredths[betSelection]):N0} монет";
+                    payment.text=game.Quote==null?"Расчёт коэффициентов…":$"Выплата при победе: {WalletStore.Payout(Math.Max(0,stake),game.Quote.Hundredths[betSelection]):N0} жетонов";
                 }
                 catch(OverflowException){valid=false;payment.text="Уменьши сумму ставки.";}
                 confirm?.SetEnabled(valid);
@@ -210,7 +210,7 @@ namespace ArmOrb
             Text(card,$"Время: {game.Simulation.Elapsed:0.0} с","small");
             if(game.IsBetFight)
             {
-                Text(card,winner<0?$"Возврат: {game.LastPayment:N0} монет":game.LastPayment>0?$"Выплата: {game.LastPayment:N0} монет":"Ставка проиграла","rule");Text(card,$"Баланс: {game.Wallet.Data.balance:N0}","rule");
+                Text(card,winner<0?$"Возврат: {game.LastPayment:N0} жетонов":game.LastPayment>0?$"Выплата: {game.LastPayment:N0} жетонов":"Ставка проиграла","rule");Text(card,$"Баланс: {game.Wallet.Data.balance:N0}","rule");
                 Button(card,"Следующий бой",()=>{game.BackToSetup();game.NewOffer();},"primary").name="next-bet";
             }
             else Button(card,game.ShowTest?"Новый бой":"К ставкам",()=>{if(game.ShowTest)game.StartFight();else game.BackToSetup();},"primary").name="rematch";
@@ -221,7 +221,7 @@ namespace ArmOrb
         void ShowRules()
         {
             var card=Dialog("Правила");var scroll=new ScrollView();scroll.style.maxHeight=550;card.Add(scroll);
-            string[] rules={"Ставка на одного победителя до начала боя. Выплата включает поставленные монеты; при ничьей ставка возвращается.",
+            string[] rules={"Ставка на одного победителя до начала боя. Выплата включает поставленные жетоны; при ничьей ставка возвращается.",
                 "Коэффициенты оцениваются скрытыми боями того же состава. Показанный бой использует отдельный сид.",
                 "В ставках и тесте после затишья шары плавно сближаются. При включённой опасной зоне с 90-й секунды сужается безопасный круг; снаружи наносится урон. С 120-й секунды опасна вся арена.",
                 "Меч: +1 урон за попадание. Копьё: 2 урона, +0,5r к длине. Кинжал: 2 урона, плавный разгон без потолка.",
@@ -231,7 +231,7 @@ namespace ArmOrb
                 "Посох: огненный шар каждую секунду; волна наносит 3 урона каждому врагу один раз. Радиус растёт на 0,35 за попадание. Сюрикен: +1 отскок за попадание.",
                 "Выбывшие больше не атакуют; уже выпущенные снаряды и наложенный яд остаются. Собственные снаряды не опасны. Усиления сбрасываются между боями.",
                 "Битва с ботами: 1–4 противника, 300 HP. Стартовый навык и новый выбор каждые 20 с. Перед боем выбирается активка: лечение или барьер. На выбор навыка 8 с; бой продолжается. Без сужения. Через 5 минут победитель определяется по доле оставшегося HP. Улучшения действуют только в этом матче.",
-                "При балансе меньше 10 монет и отсутствии незавершённой ставки можно бесплатно восстановить баланс до 1000."};
+                "При балансе меньше 10 жетонов и отсутствии незавершённой ставки можно бесплатно восстановить баланс до 1000 жетонов."};
             foreach(string rule in rules)Text(scroll,rule,"rule");Button(card,"Закрыть",CloseOverlay,"primary");
         }
         public void UpdateSafeArea()

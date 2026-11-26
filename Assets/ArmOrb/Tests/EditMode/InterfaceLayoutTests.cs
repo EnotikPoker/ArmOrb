@@ -30,10 +30,10 @@ namespace ArmOrb.Tests
             scene=EditorSceneManager.OpenScene("Assets/ArmOrb/Scenes/Main.unity",OpenSceneMode.Additive);
             game=scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<ArmOrbGame>(true)).Single();
             game.enabled=false;
-            Set(game,"Wallet",new WalletStore(directory+"/wallet"));Set(game,"BotStore",new BuildMatchStore(directory+"/bots"));
+            Set(game,"Wallet",new WalletStore(directory+"/wallet"));Set(game,"BotStore",new BuildMatchStore(directory+"/bots"));Set(game,"Collection",new CollectionProfile(directory+"/profile"));Set(game,"Runs",new RunStore(directory+"/runs"));
             window=ScriptableObject.CreateInstance<PreviewWindow>();window.position=new Rect(0,0,780,1450);window.Show();
             host=new VisualElement();host.style.position=Position.Absolute;host.style.width=720;host.style.height=1280;window.rootVisualElement.Add(host);
-            ui=new GameInterface(game,host);
+            ui=new GameInterface(game,host);typeof(ArmOrbGame).GetField("ui",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(game,ui);
         }
         [TearDown] public void Cleanup()
         {
@@ -93,6 +93,27 @@ namespace ArmOrb.Tests
             Set(game,"Mode",GameMode.Bets);ui.ShowHome();yield return Layout();Assert.That(host.Q("new-offer"),Is.Not.Null);
             Battle(2);ui.ShowPause(true);yield return Layout();Assert.That(host.Q("resume"),Is.Not.Null);
             ui.ShowPause(false);Assert.That(host.Q("resume"),Is.Null);game.BotMatch.Data.outcome=1;ui.ShowBotResult();yield return Layout();Assert.That(host.Q("new-bot-battle"),Is.Not.Null);
+        }
+        [UnityTest] public IEnumerator RunsCollectionAndOriginalModesRemainSeparatelyAvailable()
+        {
+            ui.ShowHome();yield return Layout();
+            foreach(string mode in new[]{"mode-runs","mode-bots","mode-bets","mode-test","mode-collection"})Assert.That(host.Q(mode),Is.Not.Null);
+            Set(game,"AtMainMenu",false);Set(game,"Mode",GameMode.Runs);ui.ShowHome();yield return Layout();Assert.That(host.Q("start-run"),Is.Not.Null);
+            Assert.That(host.Query<Button>(className:"weapon-tile").ToList().Count,Is.EqualTo(10));
+            Set(game,"Mode",GameMode.Collection);ui.ShowHome();yield return Layout();Assert.That(host.Query<VisualElement>(className:"cosmetic-card").ToList().Count,Is.EqualTo(10));
+            Assert.That(host.Q<Button>("buy-robot").enabledSelf,Is.False);Assert.That(host.Q("equip-classic"),Is.Not.Null);
+            for(int stage=0;stage<5;stage++)game.Collection.GrantStage("ui-preview",stage,0,stage*30);ui.ShowHome();yield return Layout();
+            Submit(host.Q<Button>("buy-robot"));yield return Layout();Assert.That(host.Q("confirm-buy-robot"),Is.Not.Null);
+            Submit(host.Q<Button>("confirm-buy-robot"));yield return Layout();Assert.That(game.Collection.Data.coins,Is.EqualTo(140));Assert.That(host.Q("equip-robot"),Is.Not.Null);
+            Submit(host.Q<Button>("equip-robot"));yield return Layout();Assert.That(game.Collection.Data.skin,Is.EqualTo("robot"));
+        }
+        [UnityTest] public IEnumerator RunPreviewAndRewardShowHealthAndHaveNoCountdown()
+        {
+            var factory=new SimulationFactory(game.weapons,game.settings);var run=new RunController(factory,game.Runs,game.Collection,0,BattleAbility.Heal,1234);
+            Set(game,"Run",run);Set(game,"AtMainMenu",false);Set(game,"Mode",GameMode.Runs);ui.ShowHome();yield return Layout();Assert.That(host.Q("start-run-stage"),Is.Not.Null);
+            run.StartStage();run.Battle.Choose(run.Battle.AutoChoice());run.Battle.Simulation.Orbs[0].Health.Damage(100);
+            foreach(var orb in run.Battle.Simulation.Orbs.Skip(1))orb.Health.Damage(100000);run.Tick(1f/120);ui.ShowHome();yield return Layout();
+            Assert.That(host.Q("run-reward-0"),Is.Not.Null);Assert.That(host.Q("skill-countdown"),Is.Null);Assert.That(host.Q("abandon-run"),Is.Not.Null);
         }
         static void Submit(Button button)
         {using(var e=NavigationSubmitEvent.GetPooled()){e.target=button;button.SendEvent(e);}}

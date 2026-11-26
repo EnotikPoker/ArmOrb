@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace ArmOrb
 {
-    public enum GameMode { Bets, Test, Bots }
+    public enum GameMode { Bets, Test, Bots, Runs, Collection }
     public enum MiniGameKind { Drawing, Tiles, Rhythm }
     public enum BotDifficulty { Easy, Normal, Hard }
     public enum BotPhase { Combat, Choice, Finished }

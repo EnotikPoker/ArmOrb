@@ -18,6 +18,7 @@ namespace ArmOrb
         public float DamageMultiplier = 1;
         public void Heal(float amount) { if (IsDead) return; if (precise) preciseHealth = System.Math.Min(Maximum, preciseHealth + Mathf.Max(0, amount)); else Current = Mathf.Min(Maximum, Current + Mathf.Max(0, amount)); }
         public void IncreaseMaximum(float amount) { amount = Mathf.Max(0, amount); Maximum += amount; if (!IsDead) { if (precise) preciseHealth += amount; else Current += amount; } }
+        public void RestoreCurrent(float amount) { Current = Mathf.Clamp(amount,0,Maximum); }
         public void Revive(float fraction) { if (IsDead) Current = Maximum * Mathf.Clamp01(fraction); }
         public void AddPoison(float amount) => PoisonPerSecond += Mathf.Max(0, amount);
     }

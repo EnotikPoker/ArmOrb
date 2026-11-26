@@ -5,7 +5,7 @@ using UnityEngine.UIElements;
 
 namespace ArmOrb
 {
-    public sealed class ArmOrbGame : MonoBehaviour
+    public sealed partial class ArmOrbGame : MonoBehaviour
     {
         public ArenaSettings settings;
         public WeaponDefinition[] weapons;
@@ -20,7 +20,7 @@ namespace ArmOrb
         public bool IsPaused { get; private set; }
         public bool IsInFight { get; private set; }
         public bool IsBetFight { get; private set; }
-        public bool IsRestoring=>restoring!=null || botRestoring!=null;
+        public bool IsRestoring=>restoring!=null || botRestoring!=null || runRestoring!=null;
         public GameMode Mode { get; private set; }
         public bool AtMainMenu { get; private set; } = true;
         public bool ShowTest => Mode == GameMode.Test;
@@ -73,12 +73,14 @@ namespace ArmOrb
             factory=new SimulationFactory(weapons,settings);
             Wallet=new WalletStore(System.IO.Path.Combine(Application.persistentDataPath,"v05"));
             BotStore = new BuildMatchStore(System.IO.Path.Combine(Application.persistentDataPath,"v06"));
+            Collection = new CollectionProfile(System.IO.Path.Combine(Application.persistentDataPath,"v010"));
+            Runs = new RunStore(System.IO.Path.Combine(Application.persistentDataPath,"v010"));
             BotWeapon = Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.BotWeapon",0),0,9);
             BotCount = Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.BotCount",3),1,4);
             BotVariant = BattleVariant.Ability;
             BotAbility = (BattleAbility)Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.BotAbility",0),0,1);
             BotLevel = (BotDifficulty)Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.BotLevel",1),0,2);
-            Mode = (GameMode)Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.Mode",0),0,2);
+            Mode = (GameMode)Mathf.Clamp(PlayerPrefs.GetInt("ArmOrb.Mode",0),0,4);
             BotOffer = BuildMatchController.CreateOffer(BotWeapon,BotCount,random.Next(1,int.MaxValue));
             ArenaTexture=new RenderTexture(1024,1024,16,RenderTextureFormat.ARGB32){name="ArmOrb Arena"};ArenaTexture.Create();arenaCamera.targetTexture=ArenaTexture;
             projectileView=new ProjectileView(transform,weapons,arenaView.boundary.sharedMaterial);
@@ -107,14 +109,14 @@ namespace ArmOrb
         public void StartBots()
         {
             if(IsRestoring||BotStore.Pending!=null)return;
-            Calculator?.Dispose();Calculator=null;ClearFight();IsBetFight=false;IsBotFight=true;botResultShown=false;
+            Calculator?.Dispose();Calculator=null;ClearFight();IsRunFight=false;IsBetFight=false;IsBotFight=true;botResultShown=false;
             BotVariant=BattleVariant.Ability;CurrentFight=BotOffer.Copy();BotMatch=new BuildMatchController(factory,CurrentFight,BattleVariant.Ability,BotLevel,BotAbility);
             Simulation=BotMatch.Simulation;AttachFight();SavePending();
         }
         public void ResumeBots()
         {
             if(IsRestoring||BotStore.Pending==null)return;
-            AtMainMenu=false;Mode=GameMode.Bots;ClearFight();IsBetFight=false;IsBotFight=true;botResultShown=false;
+            AtMainMenu=false;Mode=GameMode.Bots;ClearFight();IsRunFight=false;IsBetFight=false;IsBotFight=true;botResultShown=false;
             var save=BotStore.Pending;CurrentFight=save.fight.Copy();
             botRestoring=Task.Run(()=>new BuildMatchController(factory,save));ui.ShowHome();
         }
@@ -174,7 +176,7 @@ namespace ArmOrb
         void StartDefinition(FightDefinition fight,bool bet)
         {
             Calculator?.Dispose();Calculator=null;
-            ClearFight();IsBotFight=false;BotMatch=null;CurrentFight=fight.Copy();IsBetFight=bet;activeBetId=bet?Wallet.Data.pending.id:null;
+            ClearFight();IsRunFight=false;IsBotFight=false;BotMatch=null;CurrentFight=fight.Copy();IsBetFight=bet;activeBetId=bet?Wallet.Data.pending.id:null;
             LastPayment=0;Error=null;Simulation=factory.Create(CurrentFight);AttachFight();
         }
         void AttachFight()
@@ -185,6 +187,8 @@ namespace ArmOrb
             for(int i=0;i<views.Length;i++)
             {
                 views[i]=Instantiate(orbPrefab,transform);views[i].Configure(ParticipantColor(i),settings.orbRadius,weapons[CurrentFight.weapons[i]].prefab,i);
+                if(Collection!=null&&i==0&&!IsBetFight&&(IsBotFight||Mode==GameMode.Test))views[i].SetCosmetic(Collection.Data.skin,Collection.Data.trail,settings.orbRadius);
+                if(IsRunFight&&Run.Data.stage==4&&i==1)views[i].SetCosmetic("knight","none",settings.orbRadius);
                 if(IsBotFight)views[i].SetBuildVisuals(settings.orbRadius,arenaView.boundary.sharedMaterial);
                 views[i].SetFocus(OrbView.IsFocus(IsBotFight,IsBetFight,LastBetSelection,i),settings.orbRadius,Simulation.Size,arenaView.boundary.sharedMaterial);
                 previousPositions[i]=Simulation.Orbs[i].Position;previousAngles[i]=Simulation.Orbs[i].Angle;
@@ -196,7 +200,7 @@ namespace ArmOrb
         public void ResumeBet()
         {
             if(Wallet.Data.pending==null||IsRestoring)return;
-            AtMainMenu=false;Mode=GameMode.Bets;ClearFight();IsBotFight=false;BotMatch=null;var pending=Wallet.Data.pending;CurrentFight=pending.fight.Copy();IsBetFight=true;
+            AtMainMenu=false;Mode=GameMode.Bets;ClearFight();IsRunFight=false;IsBotFight=false;BotMatch=null;var pending=Wallet.Data.pending;CurrentFight=pending.fight.Copy();IsBetFight=true;
             LastStake=pending.stake;LastBetSelection=pending.selection;activeBetId=pending.id;
             int ticks=pending.ticks;int frequency=factory.Frequency;var definition=CurrentFight.Copy();
             restoring=Task.Run(()=>
@@ -225,7 +229,12 @@ namespace ArmOrb
         public void SetPlaybackSpeed(float value){Options.playbackSpeed=MatchOptions.ValidSpeed(value);Options.Save();ui.RefreshSpeed();}
         bool SavePending()
         {
-            if(IsBotFight&&BotMatch!=null)
+            if(IsRunFight&&Run!=null)
+            {
+                try{Run.Save();return true;}
+                catch(Exception e){IsPaused=true;Error="Не удалось сохранить забег: "+e.Message;ui.ShowError(Error);return false;}
+            }
+            if(IsBotFight&&BotMatch!=null&&!BotMatch.Data.runBattle)
             {
                 try{BotStore.Save(BotMatch.Data);return true;}
                 catch(Exception e){IsPaused=true;Error="Не удалось сохранить битву: "+e.Message;ui.ShowError(Error);return false;}
@@ -266,6 +275,7 @@ namespace ArmOrb
                 }
                 else{Error="Не удалось восстановить битву. Можно завершить попытку и начать новую.";Debug.LogWarning(task.Exception);ui.ShowHome();}
             }
+            CompleteRunRestore();
             if(Input.GetKeyDown(KeyCode.Escape))
             {
                 if(IsInFight&&IsBotFight&&BotMatch.Data.phase==BotPhase.Finished)BackToSetup();else if(IsInFight&&Simulation.Result==MatchResult.InProgress)TogglePause();else if(IsInFight)BackToSetup();else if(!AtMainMenu)OpenMainMenu();
@@ -289,8 +299,13 @@ namespace ArmOrb
                     {
                         int commandCount=BotMatch.Data.commands.Count,sequence=BotMatch.Data.sequence;
                         BotPhase phase=BotMatch.Data.phase;
-                        BotMatch.Tick((float)clock.StepSeconds);
-                        if(BotMatch.Data.phase==BotPhase.Finished)FinishBots();
+                        if(IsRunFight)
+                        {
+                            try{Run.Tick((float)clock.StepSeconds);}
+                            catch(Exception e){IsPaused=true;Error="Не удалось сохранить награду: "+e.Message;ui.ShowSettlementError(Error,RetryRunReward);}
+                        }
+                        else BotMatch.Tick((float)clock.StepSeconds);
+                        if(BotMatch.Data.phase==BotPhase.Finished){if(IsRunFight){if(!IsPaused)FinishRunStage();}else FinishBots();}
                         else if(commandCount!=BotMatch.Data.commands.Count||sequence!=BotMatch.Data.sequence||phase!=BotMatch.Data.phase)
                         {
                             if(BotMatch.Data.phase==BotPhase.Choice)ui.CancelMiniGesture();

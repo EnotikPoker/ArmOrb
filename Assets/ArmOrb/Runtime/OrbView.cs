@@ -31,19 +31,43 @@ namespace ArmOrb
             for(int i=0;i<64;i++){float a=i*Mathf.PI*2/64;line.SetPosition(i,new Vector3(Mathf.Cos(a)*radius,Mathf.Sin(a)*radius,0));}
             return line;
         }
+        SpriteRenderer character;
+        string cosmeticTrail="none";
+        public void SetCosmetic(string skin,string selectedTrail,float radius)
+        {
+            cosmeticTrail=selectedTrail;
+            var sprite=CosmeticCatalog.Sprite(skin);if(sprite==null)return;
+            var go=new GameObject("Character cosmetic");go.transform.SetParent(transform,false);character=go.AddComponent<SpriteRenderer>();
+            character.sprite=sprite;character.sortingOrder=body.sortingOrder+1;
+            go.transform.localScale=Vector3.one*(radius*2/sprite.bounds.size.x);
+            healthLabel.transform.localPosition+=Vector3.down*radius*.35f;
+        }
+        static Sprite sparkSprite,starSprite;
+        static Sprite TrailSprite(bool star)
+        {
+            if(star&&starSprite!=null)return starSprite;if(!star&&sparkSprite!=null)return sparkSprite;
+            var texture=new Texture2D(9,9,TextureFormat.RGBA32,false){filterMode=FilterMode.Point};
+            var pixels=new Color[81];
+            for(int y=0;y<9;y++)for(int x=0;x<9;x++)
+            {int dx=Mathf.Abs(x-4),dy=Mathf.Abs(y-4);bool on=star?(dx+dy<=2||dx==0||dy==0):(dx+dy<=3);pixels[y*9+x]=on?Color.white:Color.clear;}
+            texture.SetPixels(pixels);texture.Apply();var sprite=Sprite.Create(texture,new Rect(0,0,9,9),new Vector2(.5f,.5f),9);
+            if(star)starSprite=sprite;else sparkSprite=sprite;return sprite;
+        }
         float flash;
         readonly SpriteRenderer[] trail=new SpriteRenderer[10];
         readonly Vector2[] trailPositions=new Vector2[10];
         readonly float[] trailAges=new float[10];
         int trailCount;
+        static int budgetFrame=-1,visibleGhosts;
         void DrawTrail(CombatantState state,float dt,Vector2 position)
         {
-            if(state.Weapon.Kind!=WeaponKind.Unarmed) return;
+            if(budgetFrame!=Time.frameCount){budgetFrame=Time.frameCount;visibleGhosts=0;}
+            if(state.Weapon.Kind!=WeaponKind.Unarmed&&cosmeticTrail=="none")return;
             if(trail[0]==null) for(int i=0;i<trail.Length;i++)
             {
                 var go=new GameObject("Unarmed trail");go.transform.SetParent(transform.parent,false);
-                trail[i]=go.AddComponent<SpriteRenderer>();trail[i].sprite=body.sprite;trail[i].sortingOrder=2;
-                trail[i].transform.localScale=body.transform.localScale;trail[i].enabled=false;
+                trail[i]=go.AddComponent<SpriteRenderer>();trail[i].sprite=cosmeticTrail=="stars"?TrailSprite(true):cosmeticTrail=="sparks"?TrailSprite(false):body.sprite;trail[i].sortingOrder=2;
+                trail[i].transform.localScale=cosmeticTrail=="none"?body.transform.localScale:Vector3.one*(cosmeticTrail=="dots"?.13f:.19f);trail[i].enabled=false;
             }
             if(dt>0)
             {
@@ -53,7 +77,8 @@ namespace ArmOrb
             for(int i=0;i<trailCount;i++)
             {
                 trail[i].transform.position=trailPositions[i];
-                Color c=color;c.a=0.24f*Mathf.Clamp01(1-trailAges[i]/0.22f);trail[i].color=c;trail[i].enabled=c.a>0;
+                if(cosmeticTrail=="stars"||cosmeticTrail=="sparks")trail[i].transform.rotation=Quaternion.Euler(0,0,i*37);
+                Color c=color;c.a=(cosmeticTrail=="none"?.24f:.18f)*Mathf.Clamp01(1-trailAges[i]/(cosmeticTrail=="none"?.22f:.16f));trail[i].color=c;trail[i].enabled=c.a>0&&visibleGhosts<32;if(trail[i].enabled)visibleGhosts++;
             }
         }
         public void Configure(Color tint, float radius, WeaponView weaponPrefab, int participantIndex=-1)
@@ -67,7 +92,7 @@ namespace ArmOrb
         public void Draw(CombatantState state, float radius, float dt, Vector2 position, float angle, BuildFighter build = null)
         {
             bool dead=state.Health.IsDead;
-            body.enabled=!dead;healthLabel.gameObject.SetActive(!dead);Weapon.gameObject.SetActive(!dead);
+            body.enabled=!dead;if(character)character.enabled=!dead;healthLabel.gameObject.SetActive(!dead);Weapon.gameObject.SetActive(!dead);
             if(focusRing){focusRing.enabled=!dead;focusSeparator.enabled=!dead;}
             if(buildBarrierRing)buildBarrierRing.enabled=!dead&&build!=null&&build.BarrierTotal>0;
             if(dead){foreach(var ghost in trail)if(ghost)ghost.enabled=false;return;}
@@ -82,7 +107,7 @@ namespace ArmOrb
                 if(build.CriticalFlash>0)tint=Color.Lerp(tint,new Color(1,.9f,.25f),build.CriticalFlash/.16f*.7f);
                 if(build.Invulnerable>0)tint=Color.Lerp(tint,Color.white,.6f);
             }
-            body.color = Color.Lerp(tint, Color.white, flash / 0.12f);
+            body.color = Color.Lerp(tint, Color.white, flash / 0.12f);if(character)character.color=body.color;
             healthLabel.text = HealthText(state.Health.Current);
             healthLabel.characterSize = 0.09f * Mathf.Min(1, 3f / healthLabel.text.Length);
             Weapon.Draw(state, radius, position, angle);

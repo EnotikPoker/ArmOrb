@@ -224,3 +224,30 @@ Button.selected { border-width: 2px; border-color: #6ba5ff; background-color: #2
 .number-actions { margin-top: 5px; }
 .number-actions > Button { width: 49%; margin-top: 8px; min-height: 84px; }
 .number-dialog { max-height: 100%; }
+/* v0.10 */
+.collection-link { margin-bottom: 15px; min-height: 86px; color: #ffd58a; background-color: #302b27; border-color: #6a5940; }
+.character-preview { width: 126px; height: 126px; border-radius: 100px; position: relative; align-self: center; margin: 8px; border-width: 2px; border-color: #8ca7d2; }
+.character-image { width: 100%; height: 100%; }
+.character-preview-hp { position: absolute; bottom: 21px; left: 0; right: 0; font-size: 24px; -unity-font-style: bold; color: #151821; -unity-text-align: middle-center; }
+.run-character { width: 150px; height: 150px; }
+.run-progress { margin: 16px 0; }
+.run-step { width: 17%; height: 58px; background-color: #263144; border-radius: 9px; -unity-text-align: middle-center; font-size: 27px; color: #899bb8; }
+.run-step.done { color: #83e0b3; background-color: #204338; }
+.run-step.current { border-width: 2px; border-color: #88b2ff; color: #e4edff; }
+.run-stage-badge { font-size: 21px; color: #a8c7f4; }
+.run-summary { font-size: 23px; color: #ffd58a; margin-bottom: 14px; }
+.stage-enemy { align-items: flex-start; margin-bottom: 15px; }
+.stage-enemy-body { flex-grow: 1; }
+.run-reward { min-height: 116px; flex-direction: row; align-items: center; margin-top: 12px; }
+.run-reward .vector-icon { margin-right: 16px; }
+.run-reward-body { flex-grow: 1; flex-shrink: 1; }
+.record-line { font-size: 21px; margin-top: 8px; }
+.collection-balance { font-size: 32px; color: #ffd58a; -unity-font-style: bold; margin-top: 16px; }
+.collection-current { width: 164px; height: 164px; margin: 15px; }
+.collection-grid { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+.cosmetic-card { width: 48.5%; padding: 15px; margin-bottom: 15px; border-width: 1px; border-color: #3b4860; border-radius: 12px; background-color: #202a3b; }
+.cosmetic-card.selected { border-color: #89b6ff; background-color: #2b4160; }
+.cosmetic-name { font-size: 26px; -unity-font-style: bold; -unity-text-align: middle-center; margin-top: 8px; }
+.cosmetic-price { font-size: 20px; min-height: 52px; color: #b4c7df; -unity-text-align: middle-center; margin-top: 8px; }
+.cosmetic-action { margin-top: 8px; }
+.cosmetic-trail-preview { height: 126px; width: 100%; margin-top: 8px; }

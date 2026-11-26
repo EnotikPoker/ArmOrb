@@ -53,23 +53,30 @@ namespace ArmOrb
             Button(actions,"Готово",()=>{long number=draft.Value;CloseOverlay();accepted(number);},"primary").name="number-confirm";
         }
         void CoinBalance(VisualElement parent)
-        {var row=Element(parent,"row coin-balance");row.Add(new InterfaceIcon(UiSymbol.Coins));Text(row,$"{game.Wallet.Data.balance:N0} монет","balance");}
+        {var row=Element(parent,"row coin-balance");row.Add(new InterfaceIcon(UiSymbol.Coins));Text(row,$"{game.Wallet.Data.balance:N0} жетонов","balance");}
         void ShowMainMenu()
         {
             app.AddToClassList("main-menu");
             var header=Element(app,"row header");Text(header,"ARMORB","logo");IconButton(header,UiSymbol.Settings,"",ShowSettings,"settings");
             var scroll=new ScrollView(ScrollViewMode.Vertical);scroll.AddToClassList("setup-scroll");app.Add(scroll);
             var content=Element(scroll,"main-content");
-            var hero=Button(content,"",()=>game.SelectMode(GameMode.Bots),"mode-hero");hero.name="mode-bots";
+            var hero=Button(content,"",()=>game.SelectMode(GameMode.Runs),"mode-hero");hero.name="mode-runs";
             var artwork=Element(hero,"hero-art");artwork.pickingMode=PickingMode.Ignore;
             for(int i=0;i<3;i++)
             {
                 var orb=Element(artwork,"hero-orb hero-orb-"+i);orb.style.backgroundColor=game.ParticipantColor(i);orb.pickingMode=PickingMode.Ignore;
                 WeaponImage(orb,new[]{0,1,3}[i],"hero-weapon");
             }
-            Text(hero,"Битва с ботами","hero-title").pickingMode=PickingMode.Ignore;
-            Text(hero,"Улучшения и активная способность","hero-caption").pickingMode=PickingMode.Ignore;
+            Text(hero,"Забег","hero-title").pickingMode=PickingMode.Ignore;
+            Text(hero,"Пять боёв · один билд · награды","hero-caption").pickingMode=PickingMode.Ignore;
             var arrow=Element(hero,"hero-go");arrow.Add(new InterfaceIcon(UiSymbol.Play));arrow.pickingMode=PickingMode.Ignore;
+            if(game.Collection!=null)
+            {
+                var collection=Button(content,$"Коллекция · {game.Collection.Data.coins:N0} монет",()=>game.SelectMode(GameMode.Collection),"collection-link");collection.name="mode-collection";
+            }
+            if(game.Runs?.Pending!=null&&game.Runs.Pending.phase!=RunPhase.Finished)
+            {var run=game.Runs.Pending;Button(content,$"Продолжить забег · этап {run.stage+1}/5 · {run.completed} пройдено",game.ResumeRun,"continue-card").name="continue-run";}
+            ModeCard(content,UiSymbol.Battle,"С ботами","Отдельный бой с улучшениями и активкой",GameMode.Bots,"mode-bots");
             if(game.BotStore.Pending!=null)
             {
                 var pending=game.BotStore.Pending;
@@ -77,14 +84,14 @@ namespace ArmOrb
                 card.Add(new InterfaceIcon(UiSymbol.Play));var body=Element(card,"continue-body");body.pickingMode=PickingMode.Ignore;
                 Text(body,"Продолжить битву","card-title");Text(body,$"{pending.fight.Count-1} ботов · {pending.ticks/pending.frequency/60:00}:{pending.ticks/pending.frequency%60:00}","small muted");IgnoreChildren(card);
             }
-            ModeCard(content,UiSymbol.Coins,"Ставки",$"{game.Wallet.Data.balance:N0} монет",GameMode.Bets,"mode-bets");
+            ModeCard(content,UiSymbol.Coins,"Ставки",$"{game.Wallet.Data.balance:N0} жетонов",GameMode.Bets,"mode-bets");
             if(game.Wallet.Data.pending!=null)
             {
-                var p=game.Wallet.Data.pending;var button=Button(content,$"Продолжить ставку · {p.stake:N0} монет · #{p.selection+1}",game.ResumeBet,"continue-bet");button.name="continue-bet";
+                var p=game.Wallet.Data.pending;var button=Button(content,$"Продолжить ставку · {p.stake:N0} жетонов · #{p.selection+1}",game.ResumeBet,"continue-bet");button.name="continue-bet";
             }
             ModeCard(content,UiSymbol.Test,"Тест","Оружие, здоровье и условия боя",GameMode.Test,"mode-test");
             if(!string.IsNullOrEmpty(game.Error))Text(content,game.Error,"error");
-            var footer=Element(app,"row footer");Text(footer,"v0.9.0","version");Button(footer,"Правила",ShowRules,"text-button");
+            var footer=Element(app,"row footer");Text(footer,"v0.10.0","version");Button(footer,"Правила",ShowRules,"text-button");
         }
         void ModeCard(VisualElement parent,UiSymbol symbol,string title,string caption,GameMode mode,string name)
         {
